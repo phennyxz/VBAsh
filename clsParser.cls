@@ -1,28 +1,37 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "clsParser"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
 Option Explicit
 
-Public Name As String
-Public Args As Collection
-Public Redirections As Collection
-Public OriginalText As String
+Public Function Parse(ByVal tokens As Collection) As clsCommand
+    Dim cmd As clsCommand
+    Set cmd = New clsCommand
 
-Private Sub Class_Initialize()
-    Set Args = New Collection
-    Set Redirections = New Collection
-End Sub
-
-Public Sub Init(ByVal pName As String, ByVal pOriginalText As String)
-    Name = pName
-    OriginalText = pOriginalText
-    Args.RemoveAll
-    Redirections.RemoveAll
-End Sub
-
-Public Sub AddArg(ByVal arg As String)
-    If Len(arg) > 0 Then
-        Args.Add arg
+    If tokens Is Nothing Or tokens.Count = 0 Then
+        cmd.Init "", ""
+        Set Parse = cmd
+        Exit Function
     End If
-End Sub
 
-Public Sub AddRedirection(ByVal redirection As String)
-    Redirections.Add redirection
-End Sub
+    Dim tk As clsToken
+    Set tk = tokens(1)
+    cmd.Init tk.Value, tk.Value
+
+    Dim i As Long
+    For i = 2 To tokens.Count
+        Set tk = tokens(i)
+        If tk.TokenType = "WORD" Then
+            cmd.AddArg tk.Value
+        ElseIf tk.TokenType = "EOF" Then
+            Exit For
+        End If
+    Next i
+
+    Set Parse = cmd
+End Function

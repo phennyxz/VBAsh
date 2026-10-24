@@ -1,3 +1,12 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "clsCommand"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
 Option Explicit
 
 Public Name As String
@@ -13,8 +22,8 @@ End Sub
 Public Sub Init(ByVal pName As String, ByVal pOriginalText As String)
     Name = pName
     OriginalText = pOriginalText
-    Args.RemoveAll
-    Redirections.RemoveAll
+    Set Args = New Collection
+    Set Redirections = New Collection
 End Sub
 
 Public Sub AddArg(ByVal arg As String)

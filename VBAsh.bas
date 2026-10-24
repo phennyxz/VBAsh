@@ -10,6 +10,7 @@ Public Sub VBAsh_Start()
     Set gFDTable = New clsFileDescriptorTable
 
     gConsole.Initialize
+    gFDTable.InitializeDefault gConsole
 
     Do
         Dim line As String

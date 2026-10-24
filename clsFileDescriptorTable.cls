@@ -1,35 +1,38 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "clsFileDescriptorTable"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
 Option Explicit
 
-Public Name As String
-Public SourceType As String
-Public Buffer As String
+Private mFDs As Collection
 
-Public Sub Initialize(ByVal streamName As String, ByVal streamType As String)
-    Name = streamName
-    SourceType = streamType
-    Buffer = ""
+Public Sub InitializeDefault(ByVal console As clsConsole)
+    Set mFDs = New Collection
+    SetFD 0, console.GetFD(0)
+    SetFD 1, console.GetFD(1)
+    SetFD 2, console.GetFD(2)
 End Sub
 
-Public Function WriteText(ByVal text As String) As Long
-    Buffer = Buffer & text
-    WriteText = Len(text)
+Public Sub SetFD(ByVal fd As Long, ByVal stream As clsStream)
+    On Error Resume Next
+    mFDs.Remove CStr(fd)
+    On Error GoTo 0
+    mFDs.Add stream, CStr(fd)
+End Sub
+
+Public Function GetFD(ByVal fd As Long) As clsStream
+    On Error Resume Next
+    Set GetFD = mFDs(CStr(fd))
+    On Error GoTo 0
 End Function
 
-Public Function ReadText(Optional ByVal maxChars As Long = 32767) As String
-    If Len(Buffer) = 0 Then
-        ReadText = ""
-        Exit Function
-    End If
-
-    If Len(Buffer) <= maxChars Then
-        ReadText = Buffer
-        Buffer = ""
-    Else
-        ReadText = Left$(Buffer, maxChars)
-        Buffer = Mid$(Buffer, maxChars + 1)
-    End If
-End Function
-
-Public Sub Clear()
-    Buffer = ""
+Public Sub CloseFD(ByVal fd As Long)
+    On Error Resume Next
+    mFDs.Remove CStr(fd)
+    On Error GoTo 0
 End Sub
