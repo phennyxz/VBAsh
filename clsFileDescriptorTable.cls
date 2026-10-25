@@ -1,35 +1,17 @@
 Option Explicit
 
-Public Name As String
-Public SourceType As String
-Public Buffer As String
+Private mDescriptors As Object
 
-Public Sub Initialize(ByVal streamName As String, ByVal streamType As String)
-    Name = streamName
-    SourceType = streamType
-    Buffer = ""
+Private Sub Class_Initialize()
+    Set mDescriptors = CreateObject("Scripting.Dictionary")
 End Sub
 
-Public Function WriteText(ByVal text As String) As Long
-    Buffer = Buffer & text
-    WriteText = Len(text)
+Public Sub SetDescriptor(ByVal descriptor As Long, ByVal stream As Object)
+    Set mDescriptors(CStr(descriptor)) = stream
 End Function
 
-Public Function ReadText(Optional ByVal maxChars As Long = 32767) As String
-    If Len(Buffer) = 0 Then
-        ReadText = ""
-        Exit Function
-    End If
-
-    If Len(Buffer) <= maxChars Then
-        ReadText = Buffer
-        Buffer = ""
-    Else
-        ReadText = Left$(Buffer, maxChars)
-        Buffer = Mid$(Buffer, maxChars + 1)
+Public Function GetDescriptor(ByVal descriptor As Long) As Object
+    If mDescriptors.Exists(CStr(descriptor)) Then
+        Set GetDescriptor = mDescriptors(CStr(descriptor))
     End If
 End Function
-
-Public Sub Clear()
-    Buffer = ""
-End Sub

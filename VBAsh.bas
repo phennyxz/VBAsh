@@ -27,11 +27,15 @@ Public Sub VBAsh_Start()
         Dim result As String
         result = gSession.ProcessInput(line)
 
-        If Len(result) > 0 Then
-            gConsole.WriteLine result
+        If gSession.HasOutput Then
+            If gSession.SuppressNewline Then
+                gConsole.Write result
+            Else
+                gConsole.WriteLine result
+            End If
         End If
 
-        If LCase$(Trim$(line)) = "exit" Then
+        If gSession.ShouldExit Then
             Exit Do
         End If
 

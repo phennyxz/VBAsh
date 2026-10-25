@@ -16,7 +16,7 @@ Public Function WriteText(ByVal text As String) As Long
 End Function
 
 Public Function ReadText(Optional ByVal maxChars As Long = 32767) As String
-    If Len(Buffer) = 0 Then
+    If maxChars <= 0 Or Len(Buffer) = 0 Then
         ReadText = ""
         Exit Function
     End If

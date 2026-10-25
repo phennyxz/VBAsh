@@ -20,7 +20,6 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
         End If
 
         If ch = "#" Then
-            ' Ignora comentário até final da linha
             Do While mIndex <= mLen
                 If Mid$(mSource, mIndex, 1) = vbCr Or Mid$(mSource, mIndex, 1) = vbLf Then
                     Exit Do
@@ -71,42 +70,63 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
             GoTo ContinueLoop
         End If
 
-        If ch = "'" Or ch = """" Then
-            Dim quoteCh As String
-            quoteCh = ch
-            Dim word As String
-            word = ""
-            mIndex = mIndex + 1
-
-            Do While mIndex <= mLen
-                ch = Mid$(mSource, mIndex, 1)
-                If ch = quoteCh Then
-                    mIndex = mIndex + 1
-                    Exit Do
-                End If
-                word = word & ch
-                mIndex = mIndex + 1
-            Loop
-
-            AddToken Tokenize, "WORD", word
-            GoTo ContinueLoop
-        End If
-
         Dim buffer As String
+        Dim hasWord As Boolean
         buffer = ""
+        hasWord = False
+
         Do While mIndex <= mLen
             ch = Mid$(mSource, mIndex, 1)
 
             If ch = " " Or ch = vbTab Or ch = vbCr Or ch = vbLf Or _
-               ch = "|" Or ch = ";" Or ch = ">" Or ch = "<" Or ch = "(" Or ch = ")" Or ch = "#" Then
+               ch = "|" Or ch = ";" Or ch = ">" Or ch = "<" Or ch = "(" Or ch = ")" Then
                 Exit Do
             End If
 
+            If ch = "'" Or ch = """" Then
+                Dim quoteCh As String
+                Dim quoteClosed As Boolean
+                quoteCh = ch
+                quoteClosed = False
+                hasWord = True
+                mIndex = mIndex + 1
+
+                Do While mIndex <= mLen
+                    ch = Mid$(mSource, mIndex, 1)
+                    If ch = quoteCh Then
+                        quoteClosed = True
+                        mIndex = mIndex + 1
+                        Exit Do
+                    End If
+
+                    If quoteCh = """" And ch = "\" And mIndex < mLen Then
+                        mIndex = mIndex + 1
+                        ch = Mid$(mSource, mIndex, 1)
+                    End If
+
+                    buffer = buffer & ch
+                    mIndex = mIndex + 1
+                Loop
+
+                If Not quoteClosed Then Err.Raise vbObjectError + 1000, "clsTokenizer.Tokenize", "Aspas não fechadas."
+                GoTo ContinueWord
+            End If
+
+            If ch = "\" And mIndex < mLen Then
+                mIndex = mIndex + 1
+                buffer = buffer & Mid$(mSource, mIndex, 1)
+                hasWord = True
+                mIndex = mIndex + 1
+                GoTo ContinueWord
+            End If
+
             buffer = buffer & ch
+            hasWord = True
             mIndex = mIndex + 1
+ContinueWord:
         Loop
 
-        If Len(buffer) > 0 Then
+        If hasWord Then
             AddToken Tokenize, "WORD", buffer
         End If
 

@@ -18,9 +18,7 @@ Public Sub Init(ByVal pName As String, ByVal pOriginalText As String)
 End Sub
 
 Public Sub AddArg(ByVal arg As String)
-    If Len(arg) > 0 Then
-        Args.Add arg
-    End If
+    Args.Add arg
 End Sub
 
 Public Sub AddRedirection(ByVal redirection As String)
