@@ -21,6 +21,6 @@ Public Sub AddArg(ByVal arg As String)
     Args.Add arg
 End Sub
 
-Public Sub AddRedirection(ByVal redirection As String)
+Public Sub AddRedirection(ByVal redirection As clsRedirection)
     Redirections.Add redirection
 End Sub

@@ -100,12 +100,21 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
                     End If
 
                     If quoteCh = """" And ch = "\" And mIndex < mLen Then
-                        mIndex = mIndex + 1
-                        ch = Mid$(mSource, mIndex, 1)
+                        Dim escapedChar As String
+                        escapedChar = Mid$(mSource, mIndex + 1, 1)
+                        If escapedChar = """" Or escapedChar = "\" Or escapedChar = "$" Or escapedChar = "`" Then
+                            mIndex = mIndex + 1
+                            ch = Mid$(mSource, mIndex, 1)
+                        Else
+                            buffer = buffer & ch
+                            mIndex = mIndex + 1
+                            GoTo ContinueQuoted
+                        End If
                     End If
 
                     buffer = buffer & ch
                     mIndex = mIndex + 1
+ContinueQuoted:
                 Loop
 
                 If Not quoteClosed Then Err.Raise vbObjectError + 1000, "clsTokenizer.Tokenize", "Aspas não fechadas."
