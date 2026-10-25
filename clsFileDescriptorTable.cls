@@ -8,7 +8,7 @@ End Sub
 
 Public Sub SetDescriptor(ByVal descriptor As Long, ByVal stream As Object)
     Set mDescriptors(CStr(descriptor)) = stream
-End Function
+End Sub
 
 Public Function GetDescriptor(ByVal descriptor As Long) As Object
     If mDescriptors.Exists(CStr(descriptor)) Then

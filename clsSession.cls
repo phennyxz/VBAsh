@@ -43,6 +43,7 @@ End Sub
 Public Function ProcessInput(ByVal commandLine As String) As String
     Dim trimmed As String
     Dim tokenizer As clsTokenizer
+    Dim tokens As Collection
     Dim parser As clsParser
     Dim resolver As clsCommandResolver
     Dim command As clsCommand
@@ -58,8 +59,13 @@ Public Function ProcessInput(ByVal commandLine As String) As String
     On Error GoTo CommandError
 
     Set tokenizer = New clsTokenizer
+    Set tokens = tokenizer.Tokenize(trimmed)
+    If tokens.Count = 1 Then
+        LastExitCode = 0
+        Exit Function
+    End If
     Set parser = New clsParser
-    Set command = parser.Parse(tokenizer.Tokenize(trimmed), trimmed)
+    Set command = parser.Parse(tokens, trimmed)
 
     separator = InStr(1, command.Name, "=", vbBinaryCompare)
     If separator > 1 And command.Args.Count = 0 Then
