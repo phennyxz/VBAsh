@@ -323,6 +323,7 @@ Private Function VBAshFormSetupCode() As String
         "Private mInputStart As Long", _
         "Private mTranscript As String", _
         "Private mCommandBuffer As String", _
+        "Private mRendering As Boolean", _
         "", _
         "Private Sub UserForm_Initialize()", _
         "    Me.Caption = ""VBAsh terminal""", _
@@ -369,7 +370,8 @@ End Function
 Private Function VBAshFormEventsCode() As String
     VBAshFormEventsCode = VBAshFormActivateCode() & vbCrLf & _
                           VBAshFormKeyDownEventCode() & vbCrLf & _
-                          VBAshFormKeyPressEventCode()
+                          VBAshFormKeyPressEventCode() & vbCrLf & _
+                          VBAshFormChangeEventCode()
 End Function
 
 Private Function VBAshFormActivateCode() As String
@@ -437,6 +439,13 @@ Private Function VBAshFormKeyPressEventCode() As String
         "End Sub"), vbCrLf)
 End Function
 
+Private Function VBAshFormChangeEventCode() As String
+    VBAshFormChangeEventCode = Join(Array( _
+        "Private Sub mTerminal_Change()", _
+        "    If Not mRendering Then RefreshTerminal", _
+        "End Sub"), vbCrLf)
+End Function
+
 Private Function VBAshFormCommandCode() As String
     VBAshFormCommandCode = VBAshFormRefreshCode() & vbCrLf & _
                            VBAshFormSubmitCode()
@@ -445,10 +454,12 @@ End Function
 Private Function VBAshFormRefreshCode() As String
     VBAshFormRefreshCode = Join(Array( _
         "Private Sub RefreshTerminal()", _
+        "    mRendering = True", _
         "    mTerminal.Value = mTranscript & gSession.Prompt & mCommandBuffer", _
         "    mInputStart = Len(mTranscript & gSession.Prompt)", _
         "    mTerminal.SelStart = Len(mTerminal.Value)", _
         "    mTerminal.SelLength = 0", _
+        "    mRendering = False", _
         "End Sub"), vbCrLf)
 End Function
 
