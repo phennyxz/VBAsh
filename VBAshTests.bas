@@ -46,7 +46,7 @@ Private Sub TestEcho()
     AssertTrue session.HasOutput, "echo marks output"
     AssertEqual 0, session.LastExitCode, "echo exit status"
 
-    AssertEqual "", session.ProcessInput("echo -n ""no newline"""), "echo -n output"
+    AssertEqual "no newline", session.ProcessInput("echo -n ""no newline"""), "echo -n prints text"
     AssertTrue session.SuppressNewline, "echo -n suppresses newline"
 
     AssertEqual "hello world", session.ProcessInput("echo ""hello world"""), "quoted echo"
