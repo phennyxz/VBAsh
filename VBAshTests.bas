@@ -110,6 +110,7 @@ Private Sub TestConditionals()
 
     AssertEqual "empty", session.ProcessInput( _
         "if test -z """"; then echo empty; fi"), "if supports no else branch"
+    AssertEqual 0, session.LastExitCode, "false conditional without else succeeds"
 
     session.ProcessInput "if test -d . then echo invalid; fi"
     AssertEqual 2, session.LastExitCode, "if rejects missing separator"
@@ -120,7 +121,7 @@ Private Sub TestConditionals()
     AssertEqual 1, session.LastExitCode, "test false status"
     session.ProcessInput "test ""same value"" = ""same value"""
     AssertEqual 0, session.LastExitCode, "test compares quoted strings"
-    AssertEqual 6, session.History.Count, "conditional internals do not duplicate history"
+    AssertEqual 7, session.History.Count, "conditional internals do not duplicate history"
 End Sub
 
 Private Sub TestErrorsAndExitStatus()

@@ -194,6 +194,8 @@ Private Function ExecuteIf(ByVal tokens As Collection, ByVal originalText As Str
         ExecuteIf = ExecuteTokens(TokenRange(tokens, thenStart, thenEnd), originalText)
     ElseIf elseStart > 0 Then
         ExecuteIf = ExecuteTokens(TokenRange(tokens, elseStart, elseEnd), originalText)
+    Else
+        LastExitCode = 0
     End If
 End Function
 
