@@ -26,6 +26,10 @@ Private Sub Class_Initialize()
     Register "exit", builtin
     Set builtin = New clsBuiltinTest
     Register "test", builtin
+    Set builtin = New clsBuiltinLs
+    Register "ls", builtin
+    Set builtin = New clsBuiltinMkdir
+    Register "mkdir", builtin
 End Sub
 
 Private Sub Register(ByVal name As String, ByVal builtin As IBuiltin)

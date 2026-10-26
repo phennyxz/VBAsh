@@ -7,6 +7,8 @@ Um shell mínimo implementado em VBA. A versão atual executa builtins fundament
 - `echo [-n] [texto ...]`
 - `pwd`
 - `cd [diretório]`, incluindo `cd -` e `~`
+- `ls [caminho]` para listar diretórios ou exibir o nome de um arquivo
+- `mkdir caminho` para criar um diretório
 - `export [NOME[=valor] ...]`
 - `setenv NOME valor`
 - `unset NOME [NOME ...]`
@@ -21,7 +23,7 @@ Aspas simples e duplas preservam espaços em argumentos; escapes com barra inver
 
 ## Testes
 
-No editor VBA, importe os módulos do projeto e execute a macro `VBAsh_RunTests`. Os testes cobrem tokenização, builtins, condicionais, estado da sessão, erros, códigos de saída e redirecionamento de saída.
+No editor VBA, importe os módulos do projeto e execute a macro `VBAsh_RunTests`. Os testes cobrem tokenização, builtins, operações de diretório, condicionais, estado da sessão, erros, códigos de saída e redirecionamento de saída.
 
 ## Instalação no VBAsh.xlsm
 

@@ -8,6 +8,7 @@ Public Sub VBAsh_RunTests()
     TestEcho
     TestEnvironment
     TestDirectory
+    TestFilesystem
     TestConditionals
     TestErrorsAndExitStatus
     TestRedirection
@@ -92,6 +93,48 @@ Private Sub TestDirectory()
     AssertEqual originalDirectory, session.ProcessInput("cd -"), "cd - prints previous directory"
     AssertEqual originalDirectory, session.CurrentDirectory, "cd - restores directory"
     AssertEqual 0, session.LastExitCode, "cd exit status"
+End Sub
+
+Private Sub TestFilesystem()
+    Dim session As clsSession
+    Dim fileSystem As Object
+    Dim textStream As Object
+    Dim tempRoot As String
+    Dim testRoot As String
+    Dim folderPath As String
+    Dim filePath As String
+    Dim output As String
+
+    Set session = New clsSession
+    Set fileSystem = CreateObject("Scripting.FileSystemObject")
+    tempRoot = fileSystem.GetSpecialFolder(2)
+    testRoot = fileSystem.BuildPath(tempRoot, "VBAshTests_" & fileSystem.GetTempName)
+    fileSystem.CreateFolder testRoot
+    folderPath = fileSystem.BuildPath(testRoot, "adir")
+    fileSystem.CreateFolder folderPath
+    filePath = fileSystem.BuildPath(testRoot, "bfile.txt")
+    Set textStream = fileSystem.CreateTextFile(filePath, True)
+    textStream.Close
+
+    output = session.ProcessInput("ls """ & testRoot & """")
+    AssertTrue InStr(1, output, "adir", vbBinaryCompare) > 0, "ls lists directories"
+    AssertTrue InStr(1, output, "bfile.txt", vbBinaryCompare) > 0, "ls lists files"
+    AssertEqual 0, session.LastExitCode, "ls exit status"
+
+    AssertEqual "bfile.txt", session.ProcessInput("ls """ & filePath & """"), _
+        "ls accepts a file path"
+    AssertTrue session.HasOutput, "ls marks output"
+
+    output = fileSystem.BuildPath(testRoot, "created")
+    session.ProcessInput "mkdir """ & output & """"
+    AssertTrue fileSystem.FolderExists(output), "mkdir creates a directory"
+    AssertTrue Not session.HasOutput, "mkdir has no output"
+    AssertEqual 0, session.LastExitCode, "mkdir exit status"
+
+    session.ProcessInput "mkdir"
+    AssertEqual 2, session.LastExitCode, "mkdir rejects missing path"
+
+    fileSystem.DeleteFolder testRoot, True
 End Sub
 
 Private Sub TestConditionals()

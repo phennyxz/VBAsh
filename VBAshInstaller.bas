@@ -194,6 +194,8 @@ Private Function VBAshSourceFiles() As Variant
         "clsBuiltinExit.cls", _
         "clsBuiltinExport.cls", _
         "clsBuiltinHelp.cls", _
+        "clsBuiltinLs.cls", _
+        "clsBuiltinMkdir.cls", _
         "clsBuiltinPwd.cls", _
         "clsBuiltinRegistry.cls", _
         "clsBuiltinSetEnv.cls", _
