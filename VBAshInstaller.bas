@@ -345,6 +345,7 @@ Private Function VBAshTerminalControlSetupCode() As String
         "        .Height = Me.InsideHeight - 24", _
         "        .MultiLine = True", _
         "        .ScrollBars = 3", _
+        "        .WordWrap = False", _
         "        .Locked = False", _
         "        .EnterKeyBehavior = True"), vbCrLf)
 End Function
@@ -359,8 +360,8 @@ Private Function VBAshTerminalControlStyleCode() As String
         "    End With", _
         "    mTerminal.Value = ""VBAsh pronto. Digite help para ver os comandos."" & vbCrLf & gSession.Prompt", _
         "    mTerminal.SetFocus", _
-        "    mInputStart = Len(mTerminal.Text)", _
-        "    mTerminal.SelStart = mInputStart", _
+        "    MoveCaretToEnd", _
+        "    mInputStart = mTerminal.SelStart", _
         "End Sub"), vbCrLf)
 End Function
 
@@ -429,8 +430,8 @@ Private Function VBAshFormEditingCode() As String
         "    mTerminal.SelLength = 0", _
         "End Sub", _
         "Private Sub AppendTerminalText(ByVal text As String)", _
-        "    MoveCaretToEnd", _
-        "    mTerminal.SelText = text", _
+        "    mTerminal.Value = mTerminal.Value & text", _
+        "    mTerminal.SetFocus", _
         "    MoveCaretToEnd", _
         "End Sub"), vbCrLf)
 End Function
@@ -445,8 +446,14 @@ Private Function VBAshFormSubmitStartCode() As String
         "Private Sub SubmitCommand()", _
         "    Dim commandLine As String", _
         "    Dim result As String", _
+        "    Dim currentLine As String", _
         "    If mTerminal.SelStart < mInputStart Then MoveCaretToEnd", _
-        "    commandLine = Mid$(mTerminal.Text, mInputStart + 1)", _
+        "    currentLine = mTerminal.Line(mTerminal.LineCount - 1)", _
+        "    If Left$(currentLine, Len(gSession.Prompt)) = gSession.Prompt Then", _
+        "        commandLine = Mid$(currentLine, Len(gSession.Prompt) + 1)", _
+        "    Else", _
+        "        commandLine = currentLine", _
+        "    End If", _
         "    AppendTerminalText vbCrLf", _
         "    If Len(Trim$(commandLine)) > 0 Then", _
         "        result = gSession.ProcessInput(commandLine)", _
@@ -464,7 +471,6 @@ Private Function VBAshFormSubmitFinishCode() As String
         "    Else", _
         "        AppendTerminalText gSession.Prompt", _
         "        mInputStart = mTerminal.SelStart", _
-        "        mTerminal.SetFocus", _
         "    End If", _
         "End Sub"), vbCrLf)
 End Function
