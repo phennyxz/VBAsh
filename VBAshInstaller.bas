@@ -358,9 +358,9 @@ Private Function VBAshTerminalControlStyleCode() As String
         "        .BorderStyle = 0", _
         "    End With", _
         "    mTerminal.Value = ""VBAsh pronto. Digite help para ver os comandos."" & vbCrLf & gSession.Prompt", _
-        "    mInputStart = Len(mTerminal.Value)", _
-        "    mTerminal.SelStart = mInputStart", _
         "    mTerminal.SetFocus", _
+        "    mInputStart = Len(mTerminal.Text)", _
+        "    mTerminal.SelStart = mInputStart", _
         "End Sub"), vbCrLf)
 End Function
 
