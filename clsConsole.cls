@@ -6,7 +6,7 @@ Public Sub Initialize()
     Buffer = ""
 End Sub
 
-Public Sub Write(ByVal text As String)
+Public Sub WriteText(ByVal text As String)
     Buffer = Buffer & text
     If Len(text) > 0 Then MsgBox text, vbInformation, "VBAsh"
 End Sub
