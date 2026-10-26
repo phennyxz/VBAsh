@@ -25,7 +25,7 @@ No editor VBA, importe os módulos do projeto e execute a macro `VBAsh_RunTests`
 
 Importe `VBAshInstaller.bas` para o projeto VBA do workbook e salve como `.xlsm`. No Excel, habilite o acesso confiável ao modelo de objeto do projeto VBA em Central de Confiabilidade > Configurações de Macro. Execute `VBAsh_Install`, selecione a pasta raiz contendo os arquivos deste repositório e confirme a importação; o instalador pergunta antes de iniciar `VBAsh_Start`.
 
-O instalador só importa os nomes de módulos listados nele, recusa sobrescrever módulos existentes e remove os módulos adicionados nesta tentativa caso a importação falhe. Para remover os módulos VBAsh importados, execute `VBAsh_Uninstall` e confirme. O módulo `modVBAshInstaller` é mantido para que a remoção seja explícita e auditável; ele não se apaga sozinho nem executa automaticamente ao abrir o workbook.
+O instalador só importa os nomes de módulos listados nele, recusa sobrescrever módulos existentes e remove os módulos adicionados nesta tentativa caso a importação falhe. Para remover os módulos VBAsh importados, execute `VBAsh_Uninstall` e confirme; a rotina só remove componentes se encontrar o marcador criado após a instalação. O módulo `modVBAshInstaller` é mantido para que a remoção seja explícita e auditável; ele não se apaga sozinho nem executa automaticamente ao abrir o workbook.
 
 Isso ainda não cria um UserForm nem oculta a janela do Excel: a interface atual continua usando `InputBox` e `MsgBox`.
 

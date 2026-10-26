@@ -4,6 +4,9 @@ Option Explicit
 Private Const VBEXT_CT_STDMODULE As Long = 1
 Private Const VBEXT_CT_CLASSMODULE As Long = 2
 Private Const MSO_FILE_DIALOG_FOLDER_PICKER As Long = 4
+Private Const MSO_PROPERTY_TYPE_STRING As Long = 4
+Private Const INSTALL_MARKER_NAME As String = "VBAshInstallerVersion"
+Private Const INSTALL_MARKER_VALUE As String = "1"
 
 Public Sub VBAsh_Install()
     Dim folderDialog As Object
@@ -16,6 +19,7 @@ Public Sub VBAsh_Install()
     Dim moduleName As String
     Dim sourcePath As String
     Dim sourceFolder As String
+    Dim failure As String
     Dim answer As VbMsgBoxResult
 
     Set folderDialog = Application.FileDialog(MSO_FILE_DIALOG_FOLDER_PICKER)
@@ -45,7 +49,11 @@ Public Sub VBAsh_Install()
 
     On Error GoTo ProjectAccessError
     Set project = ThisWorkbook.VBProject
-    On Error GoTo 0
+    If VBAshHasInstallMarker() Then
+        MsgBox "O instalador já registrou uma instalação neste arquivo. Execute VBAsh_Uninstall antes de reinstalar.", _
+               vbExclamation, "VBAsh"
+        Exit Sub
+    End If
 
     For Each fileName In sourceFiles
         moduleName = VBAshModuleName(CStr(fileName))
@@ -79,6 +87,8 @@ Public Sub VBAsh_Install()
         component.Name = moduleName
         component.CodeModule.AddFromString CStr(sourceCode(moduleName))
     Next fileName
+    ThisWorkbook.CustomDocumentProperties.Add _
+        INSTALL_MARKER_NAME, False, MSO_PROPERTY_TYPE_STRING, INSTALL_MARKER_VALUE
 
     On Error GoTo 0
     MsgBox "Módulos instalados. O instalador permanece no projeto; para removê-los depois, execute VBAsh_Uninstall.", _
@@ -98,12 +108,12 @@ ProjectAccessError:
     Exit Sub
 
 ImportError:
-    Dim failure As String
     failure = Err.Description
     On Error Resume Next
     For Each component In addedComponents
         project.VBComponents.Remove component
     Next component
+    If VBAshHasInstallMarker() Then ThisWorkbook.CustomDocumentProperties(INSTALL_MARKER_NAME).Delete
     On Error GoTo 0
     MsgBox "A importação falhou e os módulos adicionados nesta tentativa foram removidos." & _
            vbCrLf & failure, vbCritical, "VBAsh"
@@ -121,6 +131,12 @@ Public Sub VBAsh_Uninstall()
     Dim answer As VbMsgBoxResult
     Dim removedCount As Long
 
+    If Not VBAshHasInstallMarker() Then
+        MsgBox "Este instalador não encontrou uma instalação registrada neste arquivo; nada foi removido.", _
+               vbInformation, "VBAsh"
+        Exit Sub
+    End If
+
     answer = MsgBox( _
         "Isso removerá do projeto deste arquivo os módulos VBAsh listados pelo instalador." & _
         vbCrLf & "O módulo modVBAshInstaller não será removido." & vbCrLf & vbCrLf & _
@@ -129,7 +145,6 @@ Public Sub VBAsh_Uninstall()
 
     On Error GoTo ProjectAccessError
     Set project = ThisWorkbook.VBProject
-    On Error GoTo 0
 
     For Each moduleName In VBAshModuleNames()
         If VBAshComponentExists(project, CStr(moduleName)) Then
@@ -138,7 +153,9 @@ Public Sub VBAsh_Uninstall()
             removedCount = removedCount + 1
         End If
     Next moduleName
+    ThisWorkbook.CustomDocumentProperties(INSTALL_MARKER_NAME).Delete
 
+    On Error GoTo 0
     MsgBox CStr(removedCount) & " módulo(s) VBAsh removido(s). O instalador foi mantido.", _
            vbInformation, "VBAsh"
     Exit Sub
@@ -198,6 +215,13 @@ Private Function VBAshComponentExists(ByVal project As Object, ByVal moduleName 
             Exit Function
         End If
     Next component
+End Function
+
+Private Function VBAshHasInstallMarker() As Boolean
+    On Error Resume Next
+    VBAshHasInstallMarker = _
+        (CStr(ThisWorkbook.CustomDocumentProperties(INSTALL_MARKER_NAME).Value) = INSTALL_MARKER_VALUE)
+    On Error GoTo 0
 End Function
 
 Private Function VBAshModuleName(ByVal fileName As String) As String
