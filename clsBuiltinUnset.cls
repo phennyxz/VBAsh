@@ -11,4 +11,5 @@ Private Function IBuiltin_Execute(ByVal session As clsSession, ByVal args As Col
         End If
         session.RemoveEnv CStr(args(i))
     Next i
+    IBuiltin_Execute = ""
 End Function
