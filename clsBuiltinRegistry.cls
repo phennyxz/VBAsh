@@ -24,6 +24,8 @@ Private Sub Class_Initialize()
     Register "help", builtin
     Set builtin = New clsBuiltinExit
     Register "exit", builtin
+    Set builtin = New clsBuiltinTest
+    Register "test", builtin
 End Sub
 
 Private Sub Register(ByVal name As String, ByVal builtin As IBuiltin)

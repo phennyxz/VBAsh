@@ -10,6 +10,8 @@ Um shell mínimo implementado em VBA. A versão atual executa builtins fundament
 - `export [NOME[=valor] ...]`
 - `setenv NOME valor`
 - `unset NOME [NOME ...]`
+- `test` com expressões simples (`-n`, `-z`, `-d`, `-f`, `-e`, `=`, `!=`)
+- `if condição; then comando; [else comando;] fi` em uma única linha
 - `help`
 - `exit [status]`
 
@@ -32,6 +34,8 @@ Depois de instalar e salvar o workbook, o macro `Auto_Open` abre o terminal ao a
 ## Redirecionamento inicial
 
 `>` cria ou sobrescreve um arquivo; `>>` acrescenta saída ao arquivo. Caminhos relativos são resolvidos a partir do diretório atual da sessão. O parser reconhece outras classes de operadores, mas pipes, entrada redirecionada (`<`) e redirecionamentos múltiplos ainda não são executados.
+
+O controle condicional inicial aceita comandos simples em cada cláusula e exige `;` antes de `then`, `else` e `fi`. Não há suporte a `elif`, blocos aninhados, loops ou comandos compostos dentro das cláusulas.
 
 ## Limitações atuais
 

@@ -8,6 +8,7 @@ Public Sub VBAsh_RunTests()
     TestEcho
     TestEnvironment
     TestDirectory
+    TestConditionals
     TestErrorsAndExitStatus
     TestRedirection
     Debug.Print "VBAsh: " & mAssertions & " assertions passed."
@@ -91,6 +92,35 @@ Private Sub TestDirectory()
     AssertEqual originalDirectory, session.ProcessInput("cd -"), "cd - prints previous directory"
     AssertEqual originalDirectory, session.CurrentDirectory, "cd - restores directory"
     AssertEqual 0, session.LastExitCode, "cd exit status"
+End Sub
+
+Private Sub TestConditionals()
+    Dim session As clsSession
+
+    Set session = New clsSession
+    AssertEqual "yes", session.ProcessInput( _
+        "if test -d .; then echo yes; else echo no; fi"), "if selects true branch"
+    AssertEqual 0, session.LastExitCode, "true conditional exit status"
+    AssertTrue session.HasOutput, "conditional branch reports output"
+
+    AssertEqual "no", session.ProcessInput( _
+        "if test -e __vbash_missing_path__; then echo yes; else echo no; fi"), _
+        "if selects false branch"
+    AssertEqual 0, session.LastExitCode, "false conditional else status"
+
+    AssertEqual "empty", session.ProcessInput( _
+        "if test -z """"; then echo empty; fi"), "if supports no else branch"
+
+    session.ProcessInput "if test -d . then echo invalid; fi"
+    AssertEqual 2, session.LastExitCode, "if rejects missing separator"
+
+    session.ProcessInput "test -d ."
+    AssertEqual 0, session.LastExitCode, "test true status"
+    session.ProcessInput "test -e __vbash_missing_path__"
+    AssertEqual 1, session.LastExitCode, "test false status"
+    session.ProcessInput "test ""same value"" = ""same value"""
+    AssertEqual 0, session.LastExitCode, "test compares quoted strings"
+    AssertEqual 6, session.History.Count, "conditional internals do not duplicate history"
 End Sub
 
 Private Sub TestErrorsAndExitStatus()

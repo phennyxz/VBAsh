@@ -197,6 +197,7 @@ Private Function VBAshSourceFiles() As Variant
         "clsBuiltinPwd.cls", _
         "clsBuiltinRegistry.cls", _
         "clsBuiltinSetEnv.cls", _
+        "clsBuiltinTest.cls", _
         "clsBuiltinUnset.cls", _
         "clsCommand.cls", _
         "clsCommandResolver.cls", _
