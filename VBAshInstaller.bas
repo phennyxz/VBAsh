@@ -331,7 +331,12 @@ Private Function VBAshFormSetupCode() As String
 End Function
 
 Private Function VBAshTerminalControlCode() As String
-    VBAshTerminalControlCode = Join(Array( _
+    VBAshTerminalControlCode = VBAshTerminalControlSetupCode() & vbCrLf & _
+                                VBAshTerminalControlStyleCode()
+End Function
+
+Private Function VBAshTerminalControlSetupCode() As String
+    VBAshTerminalControlSetupCode = Join(Array( _
         "    Set mTerminal = Me.Controls.Add(""Forms.TextBox.1"", ""txtTerminal"", True)", _
         "    With mTerminal", _
         "        .Left = 12", _
@@ -341,7 +346,11 @@ Private Function VBAshTerminalControlCode() As String
         "        .MultiLine = True", _
         "        .ScrollBars = 3", _
         "        .Locked = False", _
-        "        .EnterKeyBehavior = True", _
+        "        .EnterKeyBehavior = True"), vbCrLf)
+End Function
+
+Private Function VBAshTerminalControlStyleCode() As String
+    VBAshTerminalControlStyleCode = Join(Array( _
         "        .BackColor = RGB(18, 18, 18)", _
         "        .ForeColor = RGB(220, 220, 220)", _
         "        .Font.Name = ""Consolas""", _
@@ -356,11 +365,33 @@ Private Function VBAshTerminalControlCode() As String
 End Function
 
 Private Function VBAshFormEventsCode() As String
-    VBAshFormEventsCode = Join(Array( _
+    VBAshFormEventsCode = VBAshFormActivateCode() & vbCrLf & _
+                          VBAshFormKeyDownEventCode() & vbCrLf & _
+                          VBAshFormKeyDownHandlerCode()
+End Function
+
+Private Function VBAshFormActivateCode() As String
+    VBAshFormActivateCode = Join(Array( _
         "Private Sub UserForm_Activate()", _
         "    mTerminal.SetFocus", _
-        "End Sub", _
+        "End Sub"), vbCrLf)
+End Function
+
+Private Function VBAshFormKeyDownEventCode() As String
+    VBAshFormKeyDownEventCode = Join(Array( _
         "Private Sub mTerminal_KeyDown(ByVal KeyCode As MSForms.ReturnInteger, ByVal Shift As Integer)", _
+        "    HandleTerminalKeyDown KeyCode, Shift", _
+        "End Sub"), vbCrLf)
+End Function
+
+Private Function VBAshFormKeyDownHandlerCode() As String
+    VBAshFormKeyDownHandlerCode = VBAshFormKeyDownHandlerStartCode() & vbCrLf & _
+                                  VBAshFormKeyDownHandlerEditCode()
+End Function
+
+Private Function VBAshFormKeyDownHandlerStartCode() As String
+    VBAshFormKeyDownHandlerStartCode = Join(Array( _
+        "Private Sub HandleTerminalKeyDown(ByVal KeyCode As MSForms.ReturnInteger, ByVal Shift As Integer)", _
         "    If KeyCode = vbKeyReturn Then", _
         "        KeyCode = 0", _
         "        If mTerminal.SelStart < mInputStart Then MoveCaretToEnd", _
@@ -371,7 +402,11 @@ Private Function VBAshFormEventsCode() As String
         "       mTerminal.SelStart <= mInputStart Then", _
         "        KeyCode = 0", _
         "        Exit Sub", _
-        "    End If", _
+        "    End If"), vbCrLf)
+End Function
+
+Private Function VBAshFormKeyDownHandlerEditCode() As String
+    VBAshFormKeyDownHandlerEditCode = Join(Array( _
         "    If IsProtectedSelection Then", _
         "        If KeyCode = vbKeyBack Or KeyCode = vbKeyDelete Then", _
         "            KeyCode = 0", _
@@ -408,7 +443,12 @@ Private Function VBAshFormEditingCode() As String
 End Function
 
 Private Function VBAshFormSubmitCode() As String
-    VBAshFormSubmitCode = Join(Array( _
+    VBAshFormSubmitCode = VBAshFormSubmitStartCode() & vbCrLf & _
+                          VBAshFormSubmitFinishCode()
+End Function
+
+Private Function VBAshFormSubmitStartCode() As String
+    VBAshFormSubmitStartCode = Join(Array( _
         "Private Sub SubmitCommand()", _
         "    Dim commandLine As String", _
         "    Dim result As String", _
@@ -421,7 +461,11 @@ Private Function VBAshFormSubmitCode() As String
         "            AppendTerminalText result", _
         "            If Not gSession.SuppressNewline Then AppendTerminalText vbCrLf", _
         "        End If", _
-        "    End If", _
+        "    End If"), vbCrLf)
+End Function
+
+Private Function VBAshFormSubmitFinishCode() As String
+    VBAshFormSubmitFinishCode = Join(Array( _
         "    If gSession.ShouldExit Then", _
         "        Unload Me", _
         "    Else", _
