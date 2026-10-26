@@ -3,6 +3,7 @@ Option Explicit
 
 Private Const VBEXT_CT_STDMODULE As Long = 1
 Private Const VBEXT_CT_CLASSMODULE As Long = 2
+Private Const VBEXT_CT_MSFORM As Long = 3
 Private Const MSO_FILE_DIALOG_FOLDER_PICKER As Long = 4
 Private Const MSO_PROPERTY_TYPE_STRING As Long = 4
 Private Const INSTALL_MARKER_NAME As String = "VBAshInstallerVersion"
@@ -16,6 +17,7 @@ Public Sub VBAsh_Install()
     Dim sourceCode As Object
     Dim sourceFiles As Variant
     Dim fileName As Variant
+    Dim formComponent As Object
     Dim moduleName As String
     Dim sourcePath As String
     Dim sourceFolder As String
@@ -63,10 +65,15 @@ Public Sub VBAsh_Install()
             Exit Sub
         End If
     Next fileName
+    If VBAshComponentExists(project, "frmVBAsh") Then
+        MsgBox "O formulário frmVBAsh já existe. Use VBAsh_Uninstall antes de reinstalar.", _
+               vbExclamation, "VBAsh"
+        Exit Sub
+    End If
 
     answer = MsgBox( _
         "O instalador vai adicionar " & CStr(sourceCode.Count) & _
-        " módulos VBA ao projeto deste arquivo:" & vbCrLf & ThisWorkbook.Name & vbCrLf & vbCrLf & _
+        " módulos e o formulário terminal ao projeto deste arquivo:" & vbCrLf & ThisWorkbook.Name & vbCrLf & vbCrLf & _
         "Somente continue se você confia nos arquivos da pasta selecionada:" & vbCrLf & _
         sourceFolder & vbCrLf & vbCrLf & _
         "Deseja continuar?", vbQuestion + vbYesNo + vbDefaultButton2, "Instalar VBAsh")
@@ -87,6 +94,12 @@ Public Sub VBAsh_Install()
         component.Name = moduleName
         component.CodeModule.AddFromString CStr(sourceCode(moduleName))
     Next fileName
+
+    Set formComponent = project.VBComponents.Add(VBEXT_CT_MSFORM)
+    addedComponents.Add formComponent
+    formComponent.Name = "frmVBAsh"
+    formComponent.CodeModule.AddFromString VBAshTerminalFormCode()
+
     ThisWorkbook.CustomDocumentProperties.Add _
         INSTALL_MARKER_NAME, False, MSO_PROPERTY_TYPE_STRING, INSTALL_MARKER_VALUE
 
@@ -138,7 +151,7 @@ Public Sub VBAsh_Uninstall()
     End If
 
     answer = MsgBox( _
-        "Isso removerá do projeto deste arquivo os módulos VBAsh listados pelo instalador." & _
+        "Isso removerá do projeto deste arquivo os módulos VBAsh listados pelo instalador e o formulário frmVBAsh." & _
         vbCrLf & "O módulo modVBAshInstaller não será removido." & vbCrLf & vbCrLf & _
         "Deseja continuar?", vbExclamation + vbYesNo + vbDefaultButton2, "Remover VBAsh")
     If answer <> vbYes Then Exit Sub
@@ -153,6 +166,11 @@ Public Sub VBAsh_Uninstall()
             removedCount = removedCount + 1
         End If
     Next moduleName
+    If VBAshComponentExists(project, "frmVBAsh") Then
+        Set component = project.VBComponents("frmVBAsh")
+        project.VBComponents.Remove component
+        removedCount = removedCount + 1
+    End If
     ThisWorkbook.CustomDocumentProperties(INSTALL_MARKER_NAME).Delete
 
     On Error GoTo 0
@@ -204,6 +222,97 @@ Private Function VBAshModuleNames() As Variant
         names(i) = VBAshModuleName(CStr(files(i)))
     Next i
     VBAshModuleNames = names
+End Function
+
+Private Function VBAshTerminalFormCode() As String
+    VBAshTerminalFormCode = Join(Array( _
+        "Option Explicit", _
+        "Private WithEvents mCommandInput As MSForms.TextBox", _
+        "Private mOutput As MSForms.TextBox", _
+        "Private mPrompt As MSForms.Label", _
+        "", _
+        "Private Sub UserForm_Initialize()", _
+        "    Me.Caption = ""VBAsh terminal""", _
+        "    Me.Width = 720", _
+        "    Me.Height = 480", _
+        "    Me.BackColor = RGB(24, 24, 24)", _
+        "    Me.StartUpPosition = 1", _
+        "", _
+        "    Set mOutput = Me.Controls.Add(""Forms.TextBox.1"", ""txtOutput"", True)", _
+        "    With mOutput", _
+        "        .Left = 12", _
+        "        .Top = 12", _
+        "        .Width = Me.InsideWidth - 24", _
+        "        .Height = Me.InsideHeight - 96", _
+        "        .MultiLine = True", _
+        "        .ScrollBars = 2", _
+        "        .Locked = True", _
+        "        .EnterKeyBehavior = True", _
+        "        .BackColor = RGB(18, 18, 18)", _
+        "        .ForeColor = RGB(220, 220, 220)", _
+        "        .Font.Name = ""Consolas""", _
+        "        .Font.Size = 10", _
+        "        .BorderStyle = 0", _
+        "    End With", _
+        "", _
+        "    Set mPrompt = Me.Controls.Add(""Forms.Label.1"", ""lblPrompt"", True)", _
+        "    With mPrompt", _
+        "        .Left = 12", _
+        "        .Top = Me.InsideHeight - 72", _
+        "        .Width = Me.InsideWidth - 24", _
+        "        .Height = 20", _
+        "        .Caption = gSession.Prompt", _
+        "        .BackColor = RGB(24, 24, 24)", _
+        "        .ForeColor = RGB(90, 220, 130)", _
+        "        .Font.Name = ""Consolas""", _
+        "        .Font.Size = 10", _
+        "    End With", _
+        "", _
+        "    Set mCommandInput = Me.Controls.Add(""Forms.TextBox.1"", ""txtCommand"", True)", _
+        "    With mCommandInput", _
+        "        .Left = 12", _
+        "        .Top = Me.InsideHeight - 46", _
+        "        .Width = Me.InsideWidth - 24", _
+        "        .Height = 24", _
+        "        .BackColor = RGB(24, 24, 24)", _
+        "        .ForeColor = RGB(245, 245, 245)", _
+        "        .Font.Name = ""Consolas""", _
+        "        .Font.Size = 10", _
+        "        .BorderStyle = 0", _
+        "    End With", _
+        "    mOutput.Value = ""VBAsh pronto. Digite help para ver os comandos."" & vbCrLf", _
+        "End Sub", _
+        "", _
+        "Private Sub UserForm_Activate()", _
+        "    mCommandInput.SetFocus", _
+        "End Sub", _
+        "", _
+        "Private Sub mCommandInput_KeyDown(ByVal KeyCode As MSForms.ReturnInteger, ByVal Shift As Integer)", _
+        "    If KeyCode = vbKeyReturn Then", _
+        "        KeyCode = 0", _
+        "        SubmitCommand", _
+        "    End If", _
+        "End Sub", _
+        "", _
+        "Private Sub SubmitCommand()", _
+        "    Dim commandLine As String", _
+        "    Dim result As String", _
+        "", _
+        "    commandLine = mCommandInput.Text", _
+        "    mCommandInput.Text = """"", _
+        "    If Len(Trim$(commandLine)) = 0 Then Exit Sub", _
+        "", _
+        "    mOutput.Value = mOutput.Value & mPrompt.Caption & commandLine & vbCrLf", _
+        "    result = gSession.ProcessInput(commandLine)", _
+        "    If gSession.HasOutput Then", _
+        "        mOutput.Value = mOutput.Value & result", _
+        "        If Not gSession.SuppressNewline Then mOutput.Value = mOutput.Value & vbCrLf", _
+        "    End If", _
+        "    mPrompt.Caption = gSession.Prompt", _
+        "    mOutput.SelStart = Len(mOutput.Value)", _
+        "", _
+        "    If gSession.ShouldExit Then Unload Me", _
+        "End Sub"), vbCrLf)
 End Function
 
 Private Function VBAshComponentExists(ByVal project As Object, ByVal moduleName As String) As Boolean
