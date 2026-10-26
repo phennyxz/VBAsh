@@ -367,7 +367,8 @@ End Function
 Private Function VBAshFormEventsCode() As String
     VBAshFormEventsCode = VBAshFormActivateCode() & vbCrLf & _
                           VBAshFormKeyDownEventCode() & vbCrLf & _
-                          VBAshFormKeyDownHandlerCode()
+                          VBAshFormKeyDownSubmitCode() & vbCrLf & _
+                          VBAshFormKeyDownEditCode()
 End Function
 
 Private Function VBAshFormActivateCode() As String
@@ -380,19 +381,11 @@ End Function
 Private Function VBAshFormKeyDownEventCode() As String
     VBAshFormKeyDownEventCode = Join(Array( _
         "Private Sub mTerminal_KeyDown(ByVal KeyCode As MSForms.ReturnInteger, ByVal Shift As Integer)", _
-        "    HandleTerminalKeyDown KeyCode, Shift", _
-        "End Sub"), vbCrLf)
+        "    If KeyCode = vbKeyReturn Then"), vbCrLf)
 End Function
 
-Private Function VBAshFormKeyDownHandlerCode() As String
-    VBAshFormKeyDownHandlerCode = VBAshFormKeyDownHandlerStartCode() & vbCrLf & _
-                                  VBAshFormKeyDownHandlerEditCode()
-End Function
-
-Private Function VBAshFormKeyDownHandlerStartCode() As String
-    VBAshFormKeyDownHandlerStartCode = Join(Array( _
-        "Private Sub HandleTerminalKeyDown(ByVal KeyCode As MSForms.ReturnInteger, ByVal Shift As Integer)", _
-        "    If KeyCode = vbKeyReturn Then", _
+Private Function VBAshFormKeyDownSubmitCode() As String
+    VBAshFormKeyDownSubmitCode = Join(Array( _
         "        KeyCode = 0", _
         "        If mTerminal.SelStart < mInputStart Then MoveCaretToEnd", _
         "        SubmitCommand", _
@@ -405,8 +398,8 @@ Private Function VBAshFormKeyDownHandlerStartCode() As String
         "    End If"), vbCrLf)
 End Function
 
-Private Function VBAshFormKeyDownHandlerEditCode() As String
-    VBAshFormKeyDownHandlerEditCode = Join(Array( _
+Private Function VBAshFormKeyDownEditCode() As String
+    VBAshFormKeyDownEditCode = Join(Array( _
         "    If IsProtectedSelection Then", _
         "        If KeyCode = vbKeyBack Or KeyCode = vbKeyDelete Then", _
         "            KeyCode = 0", _
