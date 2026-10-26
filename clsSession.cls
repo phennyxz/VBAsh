@@ -155,7 +155,7 @@ Private Sub ApplyOutputRedirection(ByVal command As clsCommand, ByVal output As 
     Set stream = New clsFileStream
     stream.OpenForWrite ResolvePath(redirection.Target), redirection.Operator = "REDIR_APPEND"
     stream.WriteText text
-    stream.Close
+    stream.CloseStream
 End Sub
 
 Private Function ResolvePath(ByVal path As String) As String

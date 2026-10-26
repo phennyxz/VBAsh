@@ -19,7 +19,7 @@ Public Function WriteText(ByVal text As String) As Long
     WriteText = Len(text)
 End Function
 
-Public Sub Close()
+Public Sub CloseStream()
     If Not mTextStream Is Nothing Then
         mTextStream.Close
         Set mTextStream = Nothing
@@ -27,5 +27,5 @@ Public Sub Close()
 End Sub
 
 Private Sub Class_Terminate()
-    Close
+    CloseStream
 End Sub
