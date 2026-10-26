@@ -327,7 +327,11 @@ Private Function VBAshFormSetupCode() As String
         "    Me.Width = 720", _
         "    Me.Height = 480", _
         "    Me.BackColor = RGB(24, 24, 24)", _
-        "    Me.StartUpPosition = 1", _
+        "    Me.StartUpPosition = 1"), vbCrLf) & vbCrLf & VBAshTerminalControlCode()
+End Function
+
+Private Function VBAshTerminalControlCode() As String
+    VBAshTerminalControlCode = Join(Array( _
         "    Set mTerminal = Me.Controls.Add(""Forms.TextBox.1"", ""txtTerminal"", True)", _
         "    With mTerminal", _
         "        .Left = 12", _
