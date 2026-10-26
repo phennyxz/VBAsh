@@ -21,6 +21,14 @@ Aspas simples e duplas preservam espaços em argumentos; escapes com barra inver
 
 No editor VBA, importe os módulos do projeto e execute a macro `VBAsh_RunTests`. Os testes cobrem tokenização, builtins, estado da sessão, erros, códigos de saída e redirecionamento de saída.
 
+## Instalação no VBAsh.xlsm
+
+Importe `VBAshInstaller.bas` para o projeto VBA do workbook e salve como `.xlsm`. No Excel, habilite o acesso confiável ao modelo de objeto do projeto VBA em Central de Confiabilidade > Configurações de Macro. Execute `VBAsh_Install`, selecione a pasta raiz contendo os arquivos deste repositório e confirme a importação; o instalador pergunta antes de iniciar `VBAsh_Start`.
+
+O instalador só importa os nomes de módulos listados nele, recusa sobrescrever módulos existentes e remove os módulos adicionados nesta tentativa caso a importação falhe. Para remover os módulos VBAsh importados, execute `VBAsh_Uninstall` e confirme. O módulo `modVBAshInstaller` é mantido para que a remoção seja explícita e auditável; ele não se apaga sozinho nem executa automaticamente ao abrir o workbook.
+
+Isso ainda não cria um UserForm nem oculta a janela do Excel: a interface atual continua usando `InputBox` e `MsgBox`.
+
 ## Redirecionamento inicial
 
 `>` cria ou sobrescreve um arquivo; `>>` acrescenta saída ao arquivo. Caminhos relativos são resolvidos a partir do diretório atual da sessão. O parser reconhece outras classes de operadores, mas pipes, entrada redirecionada (`<`) e redirecionamentos múltiplos ainda não são executados.
