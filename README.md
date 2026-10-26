@@ -15,7 +15,7 @@ Um shell mínimo implementado em VBA. A versão atual executa builtins fundament
 
 Também é possível definir uma variável com `NOME=valor`. Nomes de variáveis seguem o formato usual de identificador ASCII, e são comparados sem distinção entre maiúsculas e minúsculas.
 
-Aspas simples e duplas preservam espaços em argumentos; escapes com barra invertida são aceitos. A interface atual usa `InputBox` para entrada e `MsgBox` para saída.
+Aspas simples e duplas preservam espaços em argumentos; escapes com barra invertida são aceitos. O instalador cria um UserForm com saída rolável e entrada de comandos por Enter; mensagens de instalação e erros são exibidas em caixas de diálogo.
 
 ## Testes
 
