@@ -185,33 +185,35 @@ ProjectAccessError:
 End Sub
 
 Private Function VBAshSourceFiles() As Variant
-    VBAshSourceFiles = Array( _
-        "VBAsh.bas", _
-        "VBAshTests.bas", _
-        "IBuiltin.cls", _
-        "clsBuiltinCd.cls", _
-        "clsBuiltinEcho.cls", _
-        "clsBuiltinExit.cls", _
-        "clsBuiltinExport.cls", _
-        "clsBuiltinHelp.cls", _
-        "clsBuiltinLs.cls", _
-        "clsBuiltinMkdir.cls", _
-        "clsBuiltinPwd.cls", _
-        "clsBuiltinRegistry.cls", _
-        "clsBuiltinSetEnv.cls", _
-        "clsBuiltinTest.cls", _
-        "clsBuiltinUnset.cls", _
-        "clsCommand.cls", _
-        "clsCommandResolver.cls", _
-        "clsConsole.cls", _
-        "clsFileDescriptorTable.cls", _
-        "clsFileStream.cls", _
-        "clsParser.cls", _
-        "clsRedirection.cls", _
-        "clsSession.cls", _
-        "clsStream.cls", _
-        "clsToken.cls", _
-        "clsTokenizer.cls")
+    Dim files(0 To 25) As String
+
+    files(0) = "VBAsh.bas"
+    files(1) = "VBAshTests.bas"
+    files(2) = "IBuiltin.cls"
+    files(3) = "clsBuiltinCd.cls"
+    files(4) = "clsBuiltinEcho.cls"
+    files(5) = "clsBuiltinExit.cls"
+    files(6) = "clsBuiltinExport.cls"
+    files(7) = "clsBuiltinHelp.cls"
+    files(8) = "clsBuiltinLs.cls"
+    files(9) = "clsBuiltinMkdir.cls"
+    files(10) = "clsBuiltinPwd.cls"
+    files(11) = "clsBuiltinRegistry.cls"
+    files(12) = "clsBuiltinSetEnv.cls"
+    files(13) = "clsBuiltinTest.cls"
+    files(14) = "clsBuiltinUnset.cls"
+    files(15) = "clsCommand.cls"
+    files(16) = "clsCommandResolver.cls"
+    files(17) = "clsConsole.cls"
+    files(18) = "clsFileDescriptorTable.cls"
+    files(19) = "clsFileStream.cls"
+    files(20) = "clsParser.cls"
+    files(21) = "clsRedirection.cls"
+    files(22) = "clsSession.cls"
+    files(23) = "clsStream.cls"
+    files(24) = "clsToken.cls"
+    files(25) = "clsTokenizer.cls"
+    VBAshSourceFiles = files
 End Function
 
 Private Function VBAshModuleNames() As Variant

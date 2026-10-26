@@ -50,6 +50,8 @@ Inicie `VBAsh_Start` no VBA e experimente:
 ```text
 echo "hello world"
 pwd
+ls
+mkdir nova-pasta
 export DEMO=ok
 echo "salvo em arquivo" > output.txt
 echo "mais saída" >> output.txt

@@ -125,11 +125,19 @@ Private Sub TestFilesystem()
         "ls accepts a file path"
     AssertTrue session.HasOutput, "ls marks output"
 
+    session.ProcessInput "cd """ & testRoot & """"
+    output = session.ProcessInput("ls")
+    AssertTrue InStr(1, output, "adir", vbBinaryCompare) > 0, "ls defaults to session directory"
+
     output = fileSystem.BuildPath(testRoot, "created")
     session.ProcessInput "mkdir """ & output & """"
     AssertTrue fileSystem.FolderExists(output), "mkdir creates a directory"
     AssertTrue Not session.HasOutput, "mkdir has no output"
     AssertEqual 0, session.LastExitCode, "mkdir exit status"
+
+    session.ProcessInput "mkdir created-relative"
+    AssertTrue fileSystem.FolderExists(fileSystem.BuildPath(testRoot, "created-relative")), _
+        "mkdir resolves paths against session directory"
 
     session.ProcessInput "mkdir"
     AssertEqual 2, session.LastExitCode, "mkdir rejects missing path"
