@@ -312,9 +312,6 @@ End Function
 
 Private Function VBAshTerminalFormCode() As String
     VBAshTerminalFormCode = VBAshFormSetupCode() & vbCrLf & _
-                            VBAshFormOutputCode() & vbCrLf & _
-                            VBAshFormPromptCode() & vbCrLf & _
-                            VBAshFormInputCode() & vbCrLf & _
                             VBAshFormEventsCode() & vbCrLf & _
                             VBAshFormCommandCode()
 End Function
