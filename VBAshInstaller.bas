@@ -363,39 +363,70 @@ Private Function VBAshFormEventsCode() As String
         "Private Sub mTerminal_KeyDown(ByVal KeyCode As MSForms.ReturnInteger, ByVal Shift As Integer)", _
         "    If KeyCode = vbKeyReturn Then", _
         "        KeyCode = 0", _
+        "        If mTerminal.SelStart < mInputStart Then MoveCaretToEnd", _
         "        SubmitCommand", _
-        "    ElseIf mTerminal.SelStart < mInputStart Then", _
-        "        mTerminal.SelStart = Len(mTerminal.Text)", _
-        "        mTerminal.SelLength = 0", _
-        "    ElseIf KeyCode = vbKeyBack And mTerminal.SelLength = 0 And _", _
-        "           mTerminal.SelStart <= mInputStart Then", _
+        "        Exit Sub", _
+        "    End If", _
+        "    If KeyCode = vbKeyBack And mTerminal.SelLength = 0 And _", _
+        "       mTerminal.SelStart <= mInputStart Then", _
         "        KeyCode = 0", _
-        "    ElseIf mTerminal.SelStart + mTerminal.SelLength < mInputStart Then", _
-        "        mTerminal.SelLength = 0", _
-        "        mTerminal.SelStart = Len(mTerminal.Text)", _
+        "        Exit Sub", _
+        "    End If", _
+        "    If IsProtectedSelection Then", _
+        "        If KeyCode = vbKeyBack Or KeyCode = vbKeyDelete Then", _
+        "            KeyCode = 0", _
+        "        ElseIf (Shift And 2) <> 0 And (KeyCode = vbKeyX Or KeyCode = vbKeyV) Then", _
+        "            KeyCode = 0", _
+        "        ElseIf (Shift And 1) <> 0 And (KeyCode = vbKeyDelete Or KeyCode = vbKeyInsert) Then", _
+        "            KeyCode = 0", _
+        "        End If", _
         "    End If", _
         "End Sub"), vbCrLf)
 End Function
 
 Private Function VBAshFormCommandCode() As String
-    VBAshFormCommandCode = Join(Array( _
+    VBAshFormCommandCode = VBAshFormEditingCode() & vbCrLf & VBAshFormSubmitCode()
+End Function
+
+Private Function VBAshFormEditingCode() As String
+    VBAshFormEditingCode = Join(Array( _
+        "Private Function IsProtectedSelection() As Boolean", _
+        "    IsProtectedSelection = (mTerminal.SelStart < mInputStart)", _
+        "End Function", _
+        "Private Sub mTerminal_KeyPress(ByVal KeyAscii As MSForms.ReturnInteger)", _
+        "    If IsProtectedSelection And KeyAscii >= 32 Then KeyAscii = 0", _
+        "End Sub", _
+        "Private Sub MoveCaretToEnd()", _
+        "    mTerminal.SelStart = Len(mTerminal.Text)", _
+        "    mTerminal.SelLength = 0", _
+        "End Sub", _
+        "Private Sub AppendTerminalText(ByVal text As String)", _
+        "    MoveCaretToEnd", _
+        "    mTerminal.SelText = text", _
+        "    MoveCaretToEnd", _
+        "End Sub"), vbCrLf)
+End Function
+
+Private Function VBAshFormSubmitCode() As String
+    VBAshFormSubmitCode = Join(Array( _
         "Private Sub SubmitCommand()", _
         "    Dim commandLine As String", _
         "    Dim result As String", _
+        "    If mTerminal.SelStart < mInputStart Then MoveCaretToEnd", _
         "    commandLine = Mid$(mTerminal.Text, mInputStart + 1)", _
-        "    If Len(Trim$(commandLine)) = 0 Then Exit Sub", _
-        "    mTerminal.Value = mTerminal.Text & vbCrLf", _
-        "    result = gSession.ProcessInput(commandLine)", _
-        "    If gSession.HasOutput Then", _
-        "        mTerminal.Value = mTerminal.Text & result", _
-        "        If Not gSession.SuppressNewline Then mTerminal.Value = mTerminal.Text & vbCrLf", _
+        "    AppendTerminalText vbCrLf", _
+        "    If Len(Trim$(commandLine)) > 0 Then", _
+        "        result = gSession.ProcessInput(commandLine)", _
+        "        If gSession.HasOutput Then", _
+        "            AppendTerminalText result", _
+        "            If Not gSession.SuppressNewline Then AppendTerminalText vbCrLf", _
+        "        End If", _
         "    End If", _
         "    If gSession.ShouldExit Then", _
         "        Unload Me", _
         "    Else", _
-        "        mTerminal.Value = mTerminal.Text & gSession.Prompt", _
-        "        mInputStart = Len(mTerminal.Text)", _
-        "        mTerminal.SelStart = mInputStart", _
+        "        AppendTerminalText gSession.Prompt", _
+        "        mInputStart = mTerminal.SelStart", _
         "        mTerminal.SetFocus", _
         "    End If", _
         "End Sub"), vbCrLf)

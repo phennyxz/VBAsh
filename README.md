@@ -19,7 +19,7 @@ Um shell mínimo implementado em VBA. A versão atual executa builtins fundament
 
 Também é possível definir uma variável com `NOME=valor`. Nomes de variáveis seguem o formato usual de identificador ASCII, e são comparados sem distinção entre maiúsculas e minúsculas.
 
-Aspas simples e duplas preservam espaços em argumentos; escapes com barra invertida são aceitos. O instalador cria um UserForm de terminal clássico, com entrada e saída na mesma área rolável: pressione Enter para executar e o cursor acompanha automaticamente a saída. O histórico exibido fica protegido contra edição; mensagens de instalação e erros são exibidas em caixas de diálogo.
+Aspas simples e duplas preservam espaços em argumentos; escapes com barra invertida são aceitos. O instalador cria um UserForm de terminal clássico, com entrada e saída na mesma área rolável: pressione Enter para executar e o cursor acompanha automaticamente a saída. É possível selecionar e copiar o histórico, mas alterações, exclusões, recortes e colagens nele são bloqueados; mensagens de instalação e erros são exibidas em caixas de diálogo.
 
 ## Testes
 
