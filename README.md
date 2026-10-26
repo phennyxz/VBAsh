@@ -29,7 +29,7 @@ No editor VBA, importe os módulos do projeto e execute a macro `VBAsh_RunTests`
 
 Importe `VBAshInstaller.bas` para o projeto VBA do workbook e salve como `.xlsm`. No Excel, habilite o acesso confiável ao modelo de objeto do projeto VBA em Central de Confiabilidade > Configurações de Macro. Execute `VBAsh_Install` e selecione a pasta raiz contendo os arquivos do projeto. O instalador descobre os arquivos `.bas` e `.cls` nessa pasta automaticamente (exceto `VBAshInstaller.bas`), registra os módulos importados para permitir a desinstalação e cria o UserForm `frmVBAsh`; confirme a importação e, se desejar, o início do terminal.
 
-O instalador só importa os nomes de módulos listados nele, recusa sobrescrever módulos existentes e remove os módulos adicionados nesta tentativa caso a importação falhe. Para remover os módulos VBAsh importados, execute `VBAsh_Uninstall` e confirme; a rotina só remove componentes se encontrar o marcador criado após a instalação. O módulo `modVBAshInstaller` é mantido para que a remoção seja explícita e auditável.
+O instalador recusa sobrescrever módulos existentes e remove os módulos adicionados nesta tentativa caso a importação falhe. Para desinstalar, execute `VBAsh_Uninstall` e confirme; a rotina usa a lista exata de módulos registrada na instalação (ou a lista compatível com instalações antigas). O módulo `modVBAshInstaller` é mantido para que a remoção seja explícita e auditável.
 
 Depois de instalar e salvar o workbook, o macro `Auto_Open` abre o terminal ao abrir o arquivo com macros habilitadas. A janela do workbook fica oculta enquanto o formulário está aberto e volta a aparecer quando o terminal fecha. O Excel continua em execução; para remover VBAsh, reabra o arquivo e execute `VBAsh_Uninstall`.
 
