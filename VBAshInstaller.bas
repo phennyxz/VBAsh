@@ -8,6 +8,8 @@ Private Const MSO_FILE_DIALOG_FOLDER_PICKER As Long = 4
 Private Const MSO_PROPERTY_TYPE_STRING As Long = 4
 Private Const INSTALL_MARKER_NAME As String = "VBAshInstallerVersion"
 Private Const INSTALL_MARKER_VALUE As String = "1"
+Private Const INSTALL_MODULE_COUNT_NAME As String = "VBAshInstalledModuleCount"
+Private Const INSTALL_MODULE_PROPERTY_PREFIX As String = "VBAshInstalledModule"
 
 Public Sub VBAsh_Install()
     Dim folderDialog As Object
@@ -32,7 +34,12 @@ Public Sub VBAsh_Install()
 
     Set sourceCode = CreateObject("Scripting.Dictionary")
     sourceCode.CompareMode = vbTextCompare
-    sourceFiles = VBAshSourceFiles()
+    sourceFiles = VBAshSourceFiles(sourceFolder)
+    If IsEmpty(sourceFiles) Then
+        MsgBox "Nenhum arquivo .bas ou .cls foi encontrado na pasta selecionada.", _
+               vbExclamation, "VBAsh"
+        Exit Sub
+    End If
 
     For Each fileName In sourceFiles
         sourcePath = VBAshBuildPath(sourceFolder, CStr(fileName))
@@ -100,6 +107,7 @@ Public Sub VBAsh_Install()
     formComponent.Name = "frmVBAsh"
     formComponent.CodeModule.AddFromString VBAshTerminalFormCode()
 
+    VBAshSaveInstalledModules sourceFiles
     ThisWorkbook.CustomDocumentProperties.Add _
         INSTALL_MARKER_NAME, False, MSO_PROPERTY_TYPE_STRING, INSTALL_MARKER_VALUE
 
@@ -126,6 +134,7 @@ ImportError:
     For Each component In addedComponents
         project.VBComponents.Remove component
     Next component
+    VBAshDeleteInstalledModules sourceFiles
     If VBAshHasInstallMarker() Then ThisWorkbook.CustomDocumentProperties(INSTALL_MARKER_NAME).Delete
     On Error GoTo 0
     MsgBox "A importação falhou e os módulos adicionados nesta tentativa foram removidos." & _
@@ -151,7 +160,7 @@ Public Sub VBAsh_Uninstall()
     End If
 
     answer = MsgBox( _
-        "Isso removerá do projeto deste arquivo os módulos VBAsh listados pelo instalador e o formulário frmVBAsh." & _
+        "Isso removerá do projeto deste arquivo os módulos registrados na instalação e o formulário frmVBAsh." & _
         vbCrLf & "O módulo modVBAshInstaller não será removido." & vbCrLf & vbCrLf & _
         "Deseja continuar?", vbExclamation + vbYesNo + vbDefaultButton2, "Remover VBAsh")
     If answer <> vbYes Then Exit Sub
@@ -159,7 +168,7 @@ Public Sub VBAsh_Uninstall()
     On Error GoTo ProjectAccessError
     Set project = ThisWorkbook.VBProject
 
-    For Each moduleName In VBAshModuleNames()
+    For Each moduleName In VBAshInstalledModuleNames()
         If VBAshComponentExists(project, CStr(moduleName)) Then
             Set component = project.VBComponents(CStr(moduleName))
             project.VBComponents.Remove component
@@ -171,6 +180,7 @@ Public Sub VBAsh_Uninstall()
         project.VBComponents.Remove component
         removedCount = removedCount + 1
     End If
+    VBAshDeleteInstalledModuleProperties
     ThisWorkbook.CustomDocumentProperties(INSTALL_MARKER_NAME).Delete
 
     On Error GoTo 0
@@ -184,49 +194,120 @@ ProjectAccessError:
            Err.Description, vbCritical, "VBAsh"
 End Sub
 
-Private Function VBAshSourceFiles() As Variant
-    Dim files(0 To 25) As String
+Private Function VBAshSourceFiles(ByVal sourceFolder As String) As Variant
+    Dim fileSystem As Object
+    Dim folder As Object
+    Dim sourceFile As Object
+    Dim names As Collection
+    Dim files() As String
+    Dim extension As String
+    Dim i As Long
 
-    files(0) = "VBAsh.bas"
-    files(1) = "VBAshTests.bas"
-    files(2) = "IBuiltin.cls"
-    files(3) = "clsBuiltinCd.cls"
-    files(4) = "clsBuiltinEcho.cls"
-    files(5) = "clsBuiltinExit.cls"
-    files(6) = "clsBuiltinExport.cls"
-    files(7) = "clsBuiltinHelp.cls"
-    files(8) = "clsBuiltinLs.cls"
-    files(9) = "clsBuiltinMkdir.cls"
-    files(10) = "clsBuiltinPwd.cls"
-    files(11) = "clsBuiltinRegistry.cls"
-    files(12) = "clsBuiltinSetEnv.cls"
-    files(13) = "clsBuiltinTest.cls"
-    files(14) = "clsBuiltinUnset.cls"
-    files(15) = "clsCommand.cls"
-    files(16) = "clsCommandResolver.cls"
-    files(17) = "clsConsole.cls"
-    files(18) = "clsFileDescriptorTable.cls"
-    files(19) = "clsFileStream.cls"
-    files(20) = "clsParser.cls"
-    files(21) = "clsRedirection.cls"
-    files(22) = "clsSession.cls"
-    files(23) = "clsStream.cls"
-    files(24) = "clsToken.cls"
-    files(25) = "clsTokenizer.cls"
+    Set fileSystem = CreateObject("Scripting.FileSystemObject")
+    Set folder = fileSystem.GetFolder(sourceFolder)
+    Set names = New Collection
+    For Each sourceFile In folder.Files
+        extension = LCase$(fileSystem.GetExtensionName(sourceFile.Name))
+        If (extension = "bas" Or extension = "cls") And _
+           StrComp(sourceFile.Name, "VBAshInstaller.bas", vbTextCompare) <> 0 Then
+            names.Add CStr(sourceFile.Name)
+        End If
+    Next sourceFile
+
+    If names.Count = 0 Then Exit Function
+    ReDim files(0 To names.Count - 1)
+    For i = 1 To names.Count
+        files(i - 1) = CStr(names(i))
+    Next i
     VBAshSourceFiles = files
 End Function
 
-Private Function VBAshModuleNames() As Variant
-    Dim files As Variant
+Private Sub VBAshSaveInstalledModules(ByVal sourceFiles As Variant)
+    Dim i As Long
+
+    For i = LBound(sourceFiles) To UBound(sourceFiles)
+        ThisWorkbook.CustomDocumentProperties.Add _
+            VBAshInstalledModulePropertyName(i - LBound(sourceFiles) + 1), _
+            False, MSO_PROPERTY_TYPE_STRING, VBAshModuleName(CStr(sourceFiles(i)))
+    Next i
+    ThisWorkbook.CustomDocumentProperties.Add _
+        INSTALL_MODULE_COUNT_NAME, False, MSO_PROPERTY_TYPE_STRING, _
+        CStr(UBound(sourceFiles) - LBound(sourceFiles) + 1)
+End Sub
+
+Private Function VBAshInstalledModuleNames() As Variant
+    Dim moduleCount As Long
     Dim names() As String
     Dim i As Long
 
-    files = VBAshSourceFiles()
-    ReDim names(LBound(files) To UBound(files))
-    For i = LBound(files) To UBound(files)
-        names(i) = VBAshModuleName(CStr(files(i)))
+    If Not VBAshHasDocumentProperty(INSTALL_MODULE_COUNT_NAME) Then
+        VBAshInstalledModuleNames = VBAshLegacyModuleNames()
+        Exit Function
+    End If
+
+    moduleCount = CLng(ThisWorkbook.CustomDocumentProperties(INSTALL_MODULE_COUNT_NAME).Value)
+    If moduleCount < 1 Then
+        Err.Raise vbObjectError + 1060, "VBAsh_Uninstall", "A lista de módulos instalados está inválida."
+    End If
+    ReDim names(0 To moduleCount - 1)
+    For i = 1 To moduleCount
+        names(i - 1) = CStr(ThisWorkbook.CustomDocumentProperties( _
+            VBAshInstalledModulePropertyName(i)).Value)
     Next i
-    VBAshModuleNames = names
+    VBAshInstalledModuleNames = names
+End Function
+
+Private Function VBAshLegacyModuleNames() As Variant
+    VBAshLegacyModuleNames = Array( _
+        "VBAsh", "VBAshTests", "IBuiltin", "clsBuiltinCd", "clsBuiltinEcho", _
+        "clsBuiltinExit", "clsBuiltinExport", "clsBuiltinHelp", "clsBuiltinPwd", _
+        "clsBuiltinRegistry", "clsBuiltinSetEnv", "clsBuiltinTest", "clsBuiltinUnset", _
+        "clsCommand", "clsCommandResolver", "clsConsole", "clsFileDescriptorTable", _
+        "clsFileStream", "clsParser", "clsRedirection", "clsSession", "clsStream", _
+        "clsToken", "clsTokenizer", "clsBuiltinLs", "clsBuiltinMkdir")
+End Function
+
+Private Sub VBAshDeleteInstalledModules(ByVal sourceFiles As Variant)
+    Dim i As Long
+
+    On Error Resume Next
+    For i = LBound(sourceFiles) To UBound(sourceFiles)
+        ThisWorkbook.CustomDocumentProperties( _
+            VBAshInstalledModulePropertyName(i - LBound(sourceFiles) + 1)).Delete
+    Next i
+    ThisWorkbook.CustomDocumentProperties(INSTALL_MODULE_COUNT_NAME).Delete
+    On Error GoTo 0
+End Sub
+
+Private Sub VBAshDeleteInstalledModuleProperties()
+    Dim moduleCount As Long
+    Dim i As Long
+
+    If VBAshHasDocumentProperty(INSTALL_MODULE_COUNT_NAME) Then
+        moduleCount = CLng(ThisWorkbook.CustomDocumentProperties(INSTALL_MODULE_COUNT_NAME).Value)
+        For i = 1 To moduleCount
+            ThisWorkbook.CustomDocumentProperties(VBAshInstalledModulePropertyName(i)).Delete
+        Next i
+        ThisWorkbook.CustomDocumentProperties(INSTALL_MODULE_COUNT_NAME).Delete
+    End If
+End Sub
+
+Private Function VBAshInstalledModulePropertyName(ByVal index As Long) As String
+    VBAshInstalledModulePropertyName = INSTALL_MODULE_PROPERTY_PREFIX & Format$(index, "000")
+End Function
+
+Private Function VBAshHasDocumentProperty(ByVal propertyName As String) As Boolean
+    Dim docProperty As Object
+
+    On Error Resume Next
+    Err.Clear
+    Set docProperty = ThisWorkbook.CustomDocumentProperties(propertyName)
+    VBAshHasDocumentProperty = (Err.Number = 0)
+    If Err.Number <> 0 Then
+        Err.Clear
+        VBAshHasDocumentProperty = False
+    End If
+    On Error GoTo 0
 End Function
 
 Private Function VBAshTerminalFormCode() As String
