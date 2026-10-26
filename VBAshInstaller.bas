@@ -225,7 +225,16 @@ Private Function VBAshModuleNames() As Variant
 End Function
 
 Private Function VBAshTerminalFormCode() As String
-    VBAshTerminalFormCode = Join(Array( _
+    VBAshTerminalFormCode = VBAshFormSetupCode() & vbCrLf & _
+                            VBAshFormOutputCode() & vbCrLf & _
+                            VBAshFormPromptCode() & vbCrLf & _
+                            VBAshFormInputCode() & vbCrLf & _
+                            VBAshFormEventsCode() & vbCrLf & _
+                            VBAshFormCommandCode()
+End Function
+
+Private Function VBAshFormSetupCode() As String
+    VBAshFormSetupCode = Join(Array( _
         "Option Explicit", _
         "Private WithEvents mCommandInput As MSForms.TextBox", _
         "Private mOutput As MSForms.TextBox", _
@@ -236,8 +245,11 @@ Private Function VBAshTerminalFormCode() As String
         "    Me.Width = 720", _
         "    Me.Height = 480", _
         "    Me.BackColor = RGB(24, 24, 24)", _
-        "    Me.StartUpPosition = 1", _
-        "", _
+        "    Me.StartUpPosition = 1"), vbCrLf)
+End Function
+
+Private Function VBAshFormOutputCode() As String
+    VBAshFormOutputCode = Join(Array( _
         "    Set mOutput = Me.Controls.Add(""Forms.TextBox.1"", ""txtOutput"", True)", _
         "    With mOutput", _
         "        .Left = 12", _
@@ -253,8 +265,11 @@ Private Function VBAshTerminalFormCode() As String
         "        .Font.Name = ""Consolas""", _
         "        .Font.Size = 10", _
         "        .BorderStyle = 0", _
-        "    End With", _
-        "", _
+        "    End With"), vbCrLf)
+End Function
+
+Private Function VBAshFormPromptCode() As String
+    VBAshFormPromptCode = Join(Array( _
         "    Set mPrompt = Me.Controls.Add(""Forms.Label.1"", ""lblPrompt"", True)", _
         "    With mPrompt", _
         "        .Left = 12", _
@@ -266,8 +281,11 @@ Private Function VBAshTerminalFormCode() As String
         "        .ForeColor = RGB(90, 220, 130)", _
         "        .Font.Name = ""Consolas""", _
         "        .Font.Size = 10", _
-        "    End With", _
-        "", _
+        "    End With"), vbCrLf)
+End Function
+
+Private Function VBAshFormInputCode() As String
+    VBAshFormInputCode = Join(Array( _
         "    Set mCommandInput = Me.Controls.Add(""Forms.TextBox.1"", ""txtCommand"", True)", _
         "    With mCommandInput", _
         "        .Left = 12", _
@@ -281,27 +299,30 @@ Private Function VBAshTerminalFormCode() As String
         "        .BorderStyle = 0", _
         "    End With", _
         "    mOutput.Value = ""VBAsh pronto. Digite help para ver os comandos."" & vbCrLf", _
-        "End Sub", _
-        "", _
+        "End Sub"), vbCrLf)
+End Function
+
+Private Function VBAshFormEventsCode() As String
+    VBAshFormEventsCode = Join(Array( _
         "Private Sub UserForm_Activate()", _
         "    mCommandInput.SetFocus", _
         "End Sub", _
-        "", _
         "Private Sub mCommandInput_KeyDown(ByVal KeyCode As MSForms.ReturnInteger, ByVal Shift As Integer)", _
         "    If KeyCode = vbKeyReturn Then", _
         "        KeyCode = 0", _
         "        SubmitCommand", _
         "    End If", _
-        "End Sub", _
-        "", _
+        "End Sub"), vbCrLf)
+End Function
+
+Private Function VBAshFormCommandCode() As String
+    VBAshFormCommandCode = Join(Array( _
         "Private Sub SubmitCommand()", _
         "    Dim commandLine As String", _
         "    Dim result As String", _
-        "", _
         "    commandLine = mCommandInput.Text", _
         "    mCommandInput.Text = """"", _
         "    If Len(Trim$(commandLine)) = 0 Then Exit Sub", _
-        "", _
         "    mOutput.Value = mOutput.Value & mPrompt.Caption & commandLine & vbCrLf", _
         "    result = gSession.ProcessInput(commandLine)", _
         "    If gSession.HasOutput Then", _
@@ -310,7 +331,6 @@ Private Function VBAshTerminalFormCode() As String
         "    End If", _
         "    mPrompt.Caption = gSession.Prompt", _
         "    mOutput.SelStart = Len(mOutput.Value)", _
-        "", _
         "    If gSession.ShouldExit Then Unload Me", _
         "End Sub"), vbCrLf)
 End Function
