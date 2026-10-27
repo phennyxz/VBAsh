@@ -413,11 +413,15 @@ Private Function VBAshFormCommandCode() As String
         "    commandLine = mCommandInput.Text", _
         "    mCommandInput.Text = """"", _
         "    If Len(Trim$(commandLine)) = 0 Then Exit Sub", _
-        "    mOutput.Value = mOutput.Value & mPrompt.Caption & commandLine & vbCrLf", _
         "    result = gSession.ProcessInput(commandLine)", _
-        "    If gSession.HasOutput Then", _
-        "        mOutput.Value = mOutput.Value & result", _
-        "        If Not gSession.SuppressNewline Then mOutput.Value = mOutput.Value & vbCrLf", _
+        "    If gSession.ClearRequested Then", _
+        "        mOutput.Value = """"", _
+        "    Else", _
+        "        mOutput.Value = mOutput.Value & mPrompt.Caption & commandLine & vbCrLf", _
+        "        If gSession.HasOutput Then", _
+        "            mOutput.Value = mOutput.Value & result", _
+        "            If Not gSession.SuppressNewline Then mOutput.Value = mOutput.Value & vbCrLf", _
+        "        End If", _
         "    End If", _
         "    mPrompt.Caption = gSession.Prompt", _
         "    mOutput.SelStart = Len(mOutput.Value)", _

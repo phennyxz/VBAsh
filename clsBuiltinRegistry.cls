@@ -30,6 +30,8 @@ Private Sub Class_Initialize()
     Register "ls", builtin
     Set builtin = New clsBuiltinMkdir
     Register "mkdir", builtin
+    Set builtin = New clsBuiltinClear
+    Register "clear", builtin
 End Sub
 
 Private Sub Register(ByVal name As String, ByVal builtin As IBuiltin)

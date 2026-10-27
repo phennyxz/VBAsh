@@ -9,6 +9,7 @@ Um shell mínimo implementado em VBA. A versão atual executa builtins fundament
 - `cd [diretório]`, incluindo `cd -` e `~`
 - `ls [caminho]` para listar diretórios ou exibir o nome de um arquivo
 - `mkdir caminho` para criar um diretório
+- `clear` para limpar a área de saída do terminal
 - `export [NOME[=valor] ...]`
 - `setenv NOME valor`
 - `unset NOME [NOME ...]`

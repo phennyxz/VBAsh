@@ -9,6 +9,7 @@ Public Sub VBAsh_RunTests()
     TestEnvironment
     TestDirectory
     TestFilesystem
+    TestClear
     TestConditionals
     TestErrorsAndExitStatus
     TestRedirection
@@ -143,6 +144,22 @@ Private Sub TestFilesystem()
     AssertEqual 2, session.LastExitCode, "mkdir rejects missing path"
 
     fileSystem.DeleteFolder testRoot, True
+End Sub
+
+Private Sub TestClear()
+    Dim session As clsSession
+
+    Set session = New clsSession
+    AssertEqual "", session.ProcessInput("clear"), "clear has no output"
+    AssertTrue session.ClearRequested, "clear requests terminal clearing"
+    AssertTrue Not session.HasOutput, "clear suppresses output"
+    AssertEqual 0, session.LastExitCode, "clear exit status"
+
+    session.ProcessInput "pwd"
+    AssertTrue Not session.ClearRequested, "clear request resets for next command"
+
+    session.ProcessInput "clear extra"
+    AssertEqual 2, session.LastExitCode, "clear rejects arguments"
 End Sub
 
 Private Sub TestConditionals()

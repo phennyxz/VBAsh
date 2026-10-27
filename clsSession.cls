@@ -8,6 +8,7 @@ Public Prompt As String
 Public ShouldExit As Boolean
 Public HasOutput As Boolean
 Public SuppressNewline As Boolean
+Public ClearRequested As Boolean
 
 Private mPreviousDirectory As String
 Private mBuiltinRegistry As clsCommandResolver
@@ -63,6 +64,7 @@ Public Function ProcessInput(ByVal commandLine As String) As String
 
     HasOutput = False
     SuppressNewline = False
+    ClearRequested = False
     trimmed = Trim$(commandLine)
     If Len(trimmed) = 0 Then Exit Function
 
