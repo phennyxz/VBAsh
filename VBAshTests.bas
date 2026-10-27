@@ -39,6 +39,17 @@ Private Sub TestTokenizer()
     Set tokens = tokenizer.Tokenize("echo ""C:\Program Files\VBAsh""")
     Set token = tokens(2)
     AssertEqual "C:\Program Files\VBAsh", token.Value, "quoted Windows path keeps backslashes"
+
+    Set tokens = tokenizer.Tokenize("echo a && echo b || echo c")
+    AssertEqual 9, tokens.Count, "logical operators are separate tokens"
+    Set token = tokens(3)
+    AssertEqual "AND_IF", token.TokenType, "and-if token"
+    Set token = tokens(6)
+    AssertEqual "OR_IF", token.TokenType, "or-if token"
+
+    Set tokens = tokenizer.Tokenize("echo ""a && b""")
+    Set token = tokens(2)
+    AssertEqual "a && b", token.Value, "logical operators remain literal inside quotes"
 End Sub
 
 Private Sub TestEcho()
@@ -190,6 +201,30 @@ Private Sub TestConditionals()
     session.ProcessInput "test ""same value"" = ""same value"""
     AssertEqual 0, session.LastExitCode, "test compares quoted strings"
     AssertEqual 7, session.History.Count, "conditional internals do not duplicate history"
+
+    AssertEqual "bracket", session.ProcessInput( _
+        "if [ -d . ] && [ -n ok ]; then echo bracket; else echo no; fi"), _
+        "if accepts bracket test with and-if"
+    AssertEqual "fallback", session.ProcessInput( _
+        "if [ -e __vbash_missing_path__ ] || [ -n ok ]; then echo fallback; fi"), _
+        "if accepts bracket test with or-if"
+    AssertEqual "chain", session.ProcessInput( _
+        "if test -e __vbash_missing_path__ && test -d . || [ -n ok ]; then echo chain; fi"), _
+        "if evaluates and-or operators left to right"
+    AssertEqual "short-circuit", session.ProcessInput( _
+        "if [ -d . ] || [ -q x ]; then echo short-circuit; fi"), _
+        "or-if skips a true condition's right side"
+    AssertEqual "short-circuit", session.ProcessInput( _
+        "if [ -e __vbash_missing_path__ ] && [ -q x ]; then echo no; else echo short-circuit; fi"), _
+        "and-if skips a false condition's right side"
+
+    session.ProcessInput "if [ -d .; then echo invalid; fi"
+    AssertEqual 2, session.LastExitCode, "if rejects missing closing bracket"
+    session.ProcessInput "if test -d . &&; then echo invalid; fi"
+    AssertEqual 2, session.LastExitCode, "if rejects an incomplete logical condition"
+
+    session.ProcessInput "[ -d . ]"
+    AssertEqual 0, session.LastExitCode, "bracket test builtin status"
 End Sub
 
 Private Sub TestErrorsAndExitStatus()

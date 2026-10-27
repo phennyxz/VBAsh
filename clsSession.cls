@@ -141,6 +141,7 @@ Private Function ExecuteIf(ByVal tokens As Collection, ByVal originalText As Str
     Dim branchSeparator As Long
     Dim elseSeparator As Long
     Dim markerIndex As Long
+    Dim conditionStatus As Long
 
     conditionStart = 2
     firstSeparator = FindToken(tokens, "SEMI", conditionStart)
@@ -187,18 +188,118 @@ Private Function ExecuteIf(ByVal tokens As Collection, ByVal originalText As Str
         Err.Raise vbObjectError + 1031, "clsSession.if", "Texto inesperado após 'fi'."
     End If
 
-    LastExitCode = 0
-    ExecuteTokens = ExecuteTokens(TokenRange(tokens, conditionStart, conditionEnd), originalText)
+    conditionStatus = EvaluateCondition(tokens, conditionStart, conditionEnd, originalText)
+    LastExitCode = conditionStatus
     HasOutput = False
     SuppressNewline = False
 
-    If LastExitCode = 0 Then
+    If conditionStatus = 0 Then
         ExecuteIf = ExecuteTokens(TokenRange(tokens, thenStart, thenEnd), originalText)
     ElseIf elseStart > 0 Then
         ExecuteIf = ExecuteTokens(TokenRange(tokens, elseStart, elseEnd), originalText)
     Else
         LastExitCode = 0
     End If
+End Function
+
+Private Function EvaluateCondition(ByVal tokens As Collection, ByVal firstIndex As Long, _
+                                   ByVal lastIndex As Long, ByVal originalText As String) As Long
+    Dim termStart As Long
+    Dim termEnd As Long
+    Dim operatorIndex As Long
+    Dim pendingOperator As String
+    Dim currentStatus As Long
+    Dim shouldExecute As Boolean
+    Dim termTokens As Collection
+    Dim token As clsToken
+
+    termStart = firstIndex
+    Do
+        operatorIndex = FindConditionOperator(tokens, termStart, lastIndex)
+        If operatorIndex = 0 Then
+            termEnd = lastIndex
+        Else
+            termEnd = operatorIndex - 1
+        End If
+        If termEnd < termStart Then
+            Err.Raise vbObjectError + 1032, "clsSession.if", "Condição incompleta perto de '" & pendingOperator & "'."
+        End If
+
+        Set termTokens = ConditionTerm(tokens, termStart, termEnd)
+        shouldExecute = (termStart = firstIndex)
+        If pendingOperator = "AND_IF" And currentStatus = 0 Then shouldExecute = True
+        If pendingOperator = "OR_IF" And currentStatus <> 0 Then shouldExecute = True
+
+        If shouldExecute Then
+            ExecuteTokens termTokens, originalText
+            currentStatus = LastExitCode
+        End If
+        HasOutput = False
+        SuppressNewline = False
+
+        If operatorIndex = 0 Then Exit Do
+        Set token = tokens(operatorIndex)
+        pendingOperator = token.TokenType
+        termStart = operatorIndex + 1
+        If termStart > lastIndex Then
+            Err.Raise vbObjectError + 1032, "clsSession.if", "Condição incompleta após '" & token.Value & "'."
+        End If
+    Loop
+
+    EvaluateCondition = currentStatus
+End Function
+
+Private Function FindConditionOperator(ByVal tokens As Collection, ByVal firstIndex As Long, _
+                                       ByVal lastIndex As Long) As Long
+    Dim i As Long
+    Dim token As clsToken
+
+    For i = firstIndex To lastIndex
+        Set token = tokens(i)
+        If token.TokenType = "AND_IF" Or token.TokenType = "OR_IF" Then
+            FindConditionOperator = i
+            Exit Function
+        End If
+    Next i
+End Function
+
+Private Function ConditionTerm(ByVal tokens As Collection, ByVal firstIndex As Long, _
+                               ByVal lastIndex As Long) As Collection
+    Dim firstToken As clsToken
+    Dim lastToken As clsToken
+    Dim result As New Collection
+    Dim i As Long
+
+    Set firstToken = tokens(firstIndex)
+    If firstToken.TokenType <> "WORD" Then
+        Err.Raise vbObjectError + 1033, "clsSession.if", "Esperado 'test' ou '[ expressão ]' na condição."
+    End If
+
+    If firstToken.Value = "[" Then
+        Set lastToken = tokens(lastIndex)
+        If lastToken.TokenType <> "WORD" Or lastToken.Value <> "]" Then
+            Err.Raise vbObjectError + 1034, "clsSession.if", "Esperado ']' ao final da condição."
+        End If
+        Set firstToken = New clsToken
+        firstToken.Init "WORD", "test"
+        result.Add firstToken
+        For i = firstIndex + 1 To lastIndex - 1
+            Set firstToken = tokens(i)
+            result.Add firstToken
+        Next i
+    ElseIf StrComp(firstToken.Value, "test", vbTextCompare) = 0 Then
+        For i = firstIndex To lastIndex
+            Set firstToken = tokens(i)
+            result.Add firstToken
+        Next i
+    Else
+        Err.Raise vbObjectError + 1033, "clsSession.if", "Esperado 'test' ou '[ expressão ]' na condição."
+    End If
+
+    Set firstToken = New clsToken
+    firstToken.Init "EOF", ""
+    result.Add firstToken
+    Set ConditionTerm = result
 End Function
 
 Private Function FindToken(ByVal tokens As Collection, ByVal tokenType As String, ByVal startIndex As Long) As Long

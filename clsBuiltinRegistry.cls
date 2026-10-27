@@ -32,6 +32,8 @@ Private Sub Class_Initialize()
     Register "mkdir", builtin
     Set builtin = New clsBuiltinClear
     Register "clear", builtin
+    Set builtin = New clsBuiltinBracketTest
+    Register "[", builtin
 End Sub
 
 Private Sub Register(ByVal name As String, ByVal builtin As IBuiltin)

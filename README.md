@@ -13,8 +13,8 @@ Um shell mínimo implementado em VBA. A versão atual executa builtins fundament
 - `export [NOME[=valor] ...]`
 - `setenv NOME valor`
 - `unset NOME [NOME ...]`
-- `test` com expressões simples (`-n`, `-z`, `-d`, `-f`, `-e`, `=`, `!=`)
-- `if condição; then comando; [else comando;] fi` em uma única linha
+- `test` ou `[ expressão ]` com testes simples (`-n`, `-z`, `-d`, `-f`, `-e`, `=`, `!=`)
+- `if condição; then comando; [else comando;] fi` em uma única linha; condições aceitam `&&` e `||` com avaliação da esquerda para a direita
 - `help`
 - `exit [status]`
 
@@ -38,7 +38,7 @@ Depois de instalar e salvar o workbook, o macro `Auto_Open` abre o terminal ao a
 
 `>` cria ou sobrescreve um arquivo; `>>` acrescenta saída ao arquivo. Caminhos relativos são resolvidos a partir do diretório atual da sessão. O parser reconhece outras classes de operadores, mas pipes, entrada redirecionada (`<`) e redirecionamentos múltiplos ainda não são executados.
 
-O controle condicional inicial aceita comandos simples em cada cláusula e exige `;` antes de `then`, `else` e `fi`. Não há suporte a `elif`, blocos aninhados, loops ou comandos compostos dentro das cláusulas.
+O controle condicional aceita condições com `test` ou `[ ... ]` e cadeias `&&`/`||`, e exige `;` antes de `then`, `else` e `fi`. Cada condição lógica precisa ser um teste simples. Não há suporte a `elif`, blocos aninhados, loops ou comandos compostos dentro das cláusulas. `&&` e `||` fora de `if` ainda não são listas de comandos.
 
 ## Limitações atuais
 

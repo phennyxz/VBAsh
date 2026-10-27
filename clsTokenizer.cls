@@ -30,9 +30,23 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
         End If
 
         If ch = "|" Then
-            AddToken Tokenize, "PIPE", "|"
-            mIndex = mIndex + 1
+            If Mid$(mSource, mIndex + 1, 1) = "|" Then
+                AddToken Tokenize, "OR_IF", "||"
+                mIndex = mIndex + 2
+            Else
+                AddToken Tokenize, "PIPE", "|"
+                mIndex = mIndex + 1
+            End If
             GoTo ContinueLoop
+        End If
+
+        If ch = "&" Then
+            If Mid$(mSource, mIndex + 1, 1) = "&" Then
+                AddToken Tokenize, "AND_IF", "&&"
+                mIndex = mIndex + 2
+                GoTo ContinueLoop
+            End If
+            Err.Raise vbObjectError + 1001, "clsTokenizer.Tokenize", "Operador '&' ainda não suportado."
         End If
 
         If ch = ";" Then
@@ -79,7 +93,7 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
             ch = Mid$(mSource, mIndex, 1)
 
             If ch = " " Or ch = vbTab Or ch = vbCr Or ch = vbLf Or _
-               ch = "|" Or ch = ";" Or ch = ">" Or ch = "<" Or ch = "(" Or ch = ")" Then
+               ch = "|" Or ch = "&" Or ch = ";" Or ch = ">" Or ch = "<" Or ch = "(" Or ch = ")" Then
                 Exit Do
             End If
 
