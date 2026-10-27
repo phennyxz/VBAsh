@@ -54,6 +54,12 @@ Private Sub TestTokenizer()
     Set tokens = tokenizer.Tokenize("echo hidden>&-")
     Set token = tokens(3)
     AssertEqual "REDIR_DISCARD", token.TokenType, "close-output redirection token"
+
+    Set tokens = tokenizer.Tokenize("echo hi 2> err.log 2>&1")
+    Set token = tokens(3)
+    AssertEqual "REDIR_ERR", token.TokenType, "stderr redirection token"
+    Set token = tokens(5)
+    AssertEqual "REDIR_ERR_TO_OUT", token.TokenType, "stderr-to-stdout token"
 End Sub
 
 Private Sub TestEcho()
@@ -240,10 +246,12 @@ Private Sub TestConditionals()
     AssertTrue Right$(session.ProcessInput("if ls .; then echo command; fi"), _
         Len(vbCrLf & "command")) = vbCrLf & "command", _
         "if accepts ls as a command condition"
-    AssertEqual "Command not found: command-does-not-exist" & vbCrLf & "fallback", _
-        session.ProcessInput( _
-            "if command-does-not-exist; then echo no; else echo fallback; fi"), _
+    AssertEqual "fallback", session.ProcessInput( _
+        "if command-does-not-exist; then echo no; else echo fallback; fi"), _
         "if selects else for a command with nonzero status"
+    AssertTrue session.HasErrorOutput, "if preserves condition stderr"
+    AssertEqual "Command not found: command-does-not-exist", session.ErrorOutput, _
+        "if exposes command failure on stderr"
     AssertEqual "ok", session.ProcessInput( _
         "if ls . >&-; then echo ok; else echo no; fi"), _
         "if preserves command success when stdout is closed"
@@ -266,10 +274,13 @@ Private Sub TestErrorsAndExitStatus()
     Set session = New clsSession
     session.ProcessInput "command-does-not-exist"
     AssertEqual 127, session.LastExitCode, "unknown command status"
-    AssertTrue session.HasOutput, "unknown command reports error"
+    AssertTrue session.HasErrorOutput, "unknown command reports stderr"
+    AssertEqual "Command not found: command-does-not-exist", session.ErrorOutput, _
+        "unknown command error text"
 
     session.ProcessInput "pwd extra"
     AssertEqual 2, session.LastExitCode, "invalid builtin usage status"
+    AssertTrue session.HasErrorOutput, "invalid builtin usage reports stderr"
 
     session.ProcessInput "echo ""unterminated"
     AssertEqual 2, session.LastExitCode, "lexer error status"
@@ -306,12 +317,16 @@ Private Sub TestRedirection()
     Dim session As clsSession
     Dim fileSystem As Object
     Dim path As String
+    Dim errorPath As String
+    Dim mergePath As String
     Dim textStream As Object
     Dim contents As String
 
     Set session = New clsSession
     Set fileSystem = CreateObject("Scripting.FileSystemObject")
     path = fileSystem.BuildPath(fileSystem.GetSpecialFolder(2), fileSystem.GetTempName)
+    errorPath = fileSystem.BuildPath(fileSystem.GetSpecialFolder(2), fileSystem.GetTempName)
+    mergePath = fileSystem.BuildPath(fileSystem.GetSpecialFolder(2), fileSystem.GetTempName)
 
     session.ProcessInput "echo first > """ & path & """"
     AssertEqual 0, session.LastExitCode, "overwrite redirection status"
@@ -328,6 +343,60 @@ Private Sub TestRedirection()
     AssertEqual "first" & vbCrLf & "second" & vbCrLf, contents, "append redirection content"
 
     fileSystem.DeleteFile path, True
+
+    AssertEqual session.CurrentDirectory, session.ProcessInput("pwd 2> """ & errorPath & """"), _
+        "stderr redirection preserves successful stdout"
+    AssertEqual 0, session.LastExitCode, "successful command status with stderr redirection"
+    AssertTrue session.HasOutput, "successful command keeps stdout visible"
+    AssertTrue Not session.HasErrorOutput, "successful command emits no stderr"
+    Set textStream = fileSystem.OpenTextFile(errorPath, 1)
+    contents = textStream.ReadAll
+    textStream.Close
+    AssertEqual "", contents, "successful stderr redirection creates an empty file"
+
+    session.ProcessInput "pwd extra 2> """ & errorPath & """"
+    AssertEqual 2, session.LastExitCode, "failed command status with stderr redirection"
+    AssertTrue Not session.HasOutput, "failed pwd produces no stdout"
+    AssertTrue Not session.HasErrorOutput, "stderr redirection suppresses terminal error"
+    Set textStream = fileSystem.OpenTextFile(errorPath, 1)
+    contents = textStream.ReadAll
+    textStream.Close
+    AssertEqual "VBAsh: Uso: pwd" & vbCrLf, contents, "stderr overwrite content"
+
+    session.ProcessInput "pwd extra 2>> """ & errorPath & """"
+    Set textStream = fileSystem.OpenTextFile(errorPath, 1)
+    contents = textStream.ReadAll
+    textStream.Close
+    AssertEqual "VBAsh: Uso: pwd" & vbCrLf & "VBAsh: Uso: pwd" & vbCrLf, _
+        contents, "stderr append content"
+
+    session.ProcessInput "pwd extra > """ & mergePath & """ 2>&1"
+    AssertEqual 2, session.LastExitCode, "merged stderr preserves failed command status"
+    AssertTrue Not session.HasErrorOutput, "2>&1 routes stderr away from terminal"
+    Set textStream = fileSystem.OpenTextFile(mergePath, 1)
+    contents = textStream.ReadAll
+    textStream.Close
+    AssertEqual "VBAsh: Uso: pwd" & vbCrLf, contents, "stdout then stderr merge content"
+
+    session.ProcessInput "pwd extra 2>&1 > """ & mergePath & """"
+    AssertEqual 2, session.LastExitCode, "ordered redirection preserves failed command status"
+    AssertTrue session.HasErrorOutput, "stderr-to-stdout uses the stdout destination at that point"
+    AssertEqual "VBAsh: Uso: pwd", session.ErrorOutput, "ordered stderr remains on console"
+    Set textStream = fileSystem.OpenTextFile(mergePath, 1)
+    contents = textStream.ReadAll
+    textStream.Close
+    AssertEqual "", contents, "later stdout redirection does not move earlier stderr"
+
+    session.ProcessInput "missing-command 2> """ & errorPath & """"
+    AssertEqual 127, session.LastExitCode, "unknown command status survives stderr redirection"
+    Set textStream = fileSystem.OpenTextFile(errorPath, 1)
+    contents = textStream.ReadAll
+    textStream.Close
+    AssertEqual "Command not found: missing-command" & vbCrLf, _
+        contents, "unknown command message is stderr"
+
+    fileSystem.DeleteFile errorPath, True
+    fileSystem.DeleteFile mergePath, True
 End Sub
 
 Private Sub AssertEqual(ByVal expected As Variant, ByVal actual As Variant, ByVal description As String)

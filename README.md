@@ -36,7 +36,7 @@ Depois de instalar e salvar o workbook, o macro `Auto_Open` abre o terminal ao a
 
 ## Redirecionamento inicial
 
-`>` cria ou sobrescreve um arquivo; `>>` acrescenta saída ao arquivo. `> /dev/null`, `> NUL` e `>&-` descartam a saída padrão sem alterar o código de saída do comando. Caminhos relativos são resolvidos a partir do diretório atual da sessão. Pipes, entrada redirecionada (`<`) e redirecionamentos múltiplos ainda não são executados.
+`>` cria ou sobrescreve um arquivo; `>>` acrescenta saída ao arquivo. `2>` e `2>>` fazem o mesmo para mensagens de erro (`stderr`), e `2>&1` encaminha erros para o destino atual da saída padrão (`stdout`); a ordem é respeitada, como em `comando > arquivo 2>&1`. `> /dev/null`, `> NUL` e `>&-` descartam `stdout`; `2>&-` descarta `stderr`, sem alterar o código de saída do comando. Caminhos relativos são resolvidos a partir do diretório atual da sessão. Pipes e entrada redirecionada (`<`) ainda não são executados.
 
 No `if`, `comando; then` executa um comando e decide pela cláusula com base no código de saída. A forma `[ ... ]` é um teste (equivalente a `test`), não uma forma de executar comandos; por isso `[ ls mapas ]` tenta interpretar `ls` como operador de teste e é inválido. Para comparar texto, use `=` ou `==`; para comparar números, use operadores como `-eq` e `-gt` (`eq` sem hífen não é um operador de `test`). As condições encadeadas com `&&`/`||` ainda precisam ser comandos ou testes simples. O formato exige `;` antes de `then`, `else` e `fi`. Não há suporte a `elif`, blocos aninhados, loops ou comandos compostos dentro das cláusulas. `&&` e `||` fora de `if` ainda não são listas de comandos.
 

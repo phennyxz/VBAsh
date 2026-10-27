@@ -28,7 +28,7 @@ Public Function Parse(ByVal tokens As Collection, ByVal originalText As String) 
                 Else
                     command.AddArg token.Value
                 End If
-            Case "REDIR_OUT", "REDIR_APPEND"
+            Case "REDIR_OUT", "REDIR_APPEND", "REDIR_ERR", "REDIR_ERR_APPEND"
                 If Not hasName Then
                     Err.Raise vbObjectError + 1004, "clsParser.Parse", "Comando vazio antes do redirecionamento."
                 End If
@@ -38,13 +38,17 @@ Public Function Parse(ByVal tokens As Collection, ByVal originalText As String) 
                 Set redirection = New clsRedirection
                 redirection.Operator = token.TokenType
                 expectsTarget = True
-            Case "REDIR_DISCARD"
+            Case "REDIR_DISCARD", "REDIR_ERR_DISCARD", "REDIR_ERR_TO_OUT"
                 If Not hasName Then
                     Err.Raise vbObjectError + 1004, "clsParser.Parse", "Comando vazio antes do redirecionamento."
                 End If
                 Set redirection = New clsRedirection
                 redirection.Operator = token.TokenType
-                redirection.Target = "-"
+                If token.TokenType = "REDIR_DISCARD" Or token.TokenType = "REDIR_ERR_DISCARD" Then
+                    redirection.Target = "-"
+                Else
+                    redirection.Target = "1"
+                End If
                 command.AddRedirection redirection
             Case Else
                 Err.Raise vbObjectError + 1001, "clsParser.Parse", _

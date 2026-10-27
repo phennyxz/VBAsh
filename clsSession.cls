@@ -7,6 +7,8 @@ Public LastExitCode As Long
 Public Prompt As String
 Public ShouldExit As Boolean
 Public HasOutput As Boolean
+Public ErrorOutput As String
+Public HasErrorOutput As Boolean
 Public SuppressNewline As Boolean
 Public ClearRequested As Boolean
 
@@ -63,6 +65,8 @@ Public Function ProcessInput(ByVal commandLine As String) As String
     Dim tokens As Collection
 
     HasOutput = False
+    ErrorOutput = ""
+    HasErrorOutput = False
     SuppressNewline = False
     ClearRequested = False
     trimmed = Trim$(commandLine)
@@ -86,8 +90,9 @@ Public Function ProcessInput(ByVal commandLine As String) As String
     Exit Function
 
 CommandError:
-    ProcessInput = "VBAsh: " & Err.Description
-    HasOutput = True
+    HasOutput = False
+    ErrorOutput = "VBAsh: " & Err.Description
+    HasErrorOutput = True
     If Err.Number >= vbObjectError + 1000 And Err.Number < vbObjectError + 2000 Then
         LastExitCode = 2
     Else
@@ -100,8 +105,12 @@ Private Function ExecuteTokens(ByVal tokens As Collection, ByVal originalText As
     Dim command As clsCommand
     Dim builtin As IBuiltin
     Dim separator As Long
+    Dim errorNumber As Long
+    Dim errorDescription As String
 
     HasOutput = False
+    HasErrorOutput = False
+    ErrorOutput = ""
     SuppressNewline = False
     Set parser = New clsParser
     Set command = parser.Parse(tokens, originalText)
@@ -115,19 +124,31 @@ Private Function ExecuteTokens(ByVal tokens As Collection, ByVal originalText As
 
     Set builtin = mBuiltinRegistry.Resolve(command.Name)
     If builtin Is Nothing Then
-        ExecuteTokens = "Command not found: " & command.Name
-        HasOutput = True
+        ErrorOutput = "Command not found: " & command.Name
+        HasErrorOutput = True
         LastExitCode = 127
-        Exit Function
+    Else
+        LastExitCode = 0
+        On Error GoTo BuiltinError
+        ExecuteTokens = builtin.Execute(Me, command.Args)
     End If
 
-    LastExitCode = 0
-    ExecuteTokens = builtin.Execute(Me, command.Args)
     If command.Redirections.Count > 0 Then
-        ApplyOutputRedirection command, ExecuteTokens
-        ExecuteTokens = ""
-        HasOutput = False
+        ApplyRedirections command, ExecuteTokens, ErrorOutput
     End If
+    Exit Function
+
+BuiltinError:
+    errorNumber = Err.Number
+    errorDescription = Err.Description
+    ErrorOutput = "VBAsh: " & errorDescription
+    HasErrorOutput = True
+    If errorNumber >= vbObjectError + 1000 And errorNumber < vbObjectError + 2000 Then
+        LastExitCode = 2
+    Else
+        LastExitCode = 1
+    End If
+    Resume Next
 End Function
 
 Private Function ExecuteIf(ByVal tokens As Collection, ByVal originalText As String) As String
@@ -148,6 +169,10 @@ Private Function ExecuteIf(ByVal tokens As Collection, ByVal originalText As Str
     Dim branchOutput As String
     Dim branchHasOutput As Boolean
     Dim branchSuppressNewline As Boolean
+    Dim conditionErrors As String
+    Dim conditionHasErrors As Boolean
+    Dim branchErrors As String
+    Dim branchHasErrors As Boolean
 
     conditionStart = 2
     firstSeparator = FindToken(tokens, "SEMI", conditionStart)
@@ -195,7 +220,8 @@ Private Function ExecuteIf(ByVal tokens As Collection, ByVal originalText As Str
     End If
 
     conditionStatus = EvaluateCondition(tokens, conditionStart, conditionEnd, originalText, _
-                                        conditionOutput, conditionHasOutput, conditionSuppressNewline)
+                                        conditionOutput, conditionHasOutput, conditionSuppressNewline, _
+                                        conditionErrors, conditionHasErrors)
     LastExitCode = conditionStatus
     HasOutput = False
     SuppressNewline = False
@@ -204,10 +230,14 @@ Private Function ExecuteIf(ByVal tokens As Collection, ByVal originalText As Str
         branchOutput = ExecuteTokens(TokenRange(tokens, thenStart, thenEnd), originalText)
         branchHasOutput = HasOutput
         branchSuppressNewline = SuppressNewline
+        branchErrors = ErrorOutput
+        branchHasErrors = HasErrorOutput
     ElseIf elseStart > 0 Then
         branchOutput = ExecuteTokens(TokenRange(tokens, elseStart, elseEnd), originalText)
         branchHasOutput = HasOutput
         branchSuppressNewline = SuppressNewline
+        branchErrors = ErrorOutput
+        branchHasErrors = HasErrorOutput
     Else
         LastExitCode = 0
     End If
@@ -222,12 +252,17 @@ Private Function ExecuteIf(ByVal tokens As Collection, ByVal originalText As Str
     Else
         SuppressNewline = conditionSuppressNewline
     End If
+    ErrorOutput = conditionErrors
+    If Len(conditionErrors) > 0 And Len(branchErrors) > 0 Then ErrorOutput = ErrorOutput & vbCrLf
+    ErrorOutput = ErrorOutput & branchErrors
+    HasErrorOutput = conditionHasErrors Or branchHasErrors
 End Function
 
 Private Function EvaluateCondition(ByVal tokens As Collection, ByVal firstIndex As Long, _
                                    ByVal lastIndex As Long, ByVal originalText As String, _
                                    ByRef conditionOutput As String, ByRef conditionHasOutput As Boolean, _
-                                   ByRef conditionSuppressNewline As Boolean) As Long
+                                   ByRef conditionSuppressNewline As Boolean, _
+                                   ByRef conditionErrors As String, ByRef conditionHasErrors As Boolean) As Long
     Dim termStart As Long
     Dim termEnd As Long
     Dim operatorIndex As Long
@@ -237,6 +272,7 @@ Private Function EvaluateCondition(ByVal tokens As Collection, ByVal firstIndex 
     Dim termTokens As Collection
     Dim token As clsToken
     Dim termOutput As String
+    Dim termErrors As String
 
     termStart = firstIndex
     Do
@@ -258,6 +294,12 @@ Private Function EvaluateCondition(ByVal tokens As Collection, ByVal firstIndex 
         If shouldExecute Then
             termOutput = ExecuteConditionTerm(termTokens, originalText)
             currentStatus = LastExitCode
+            termErrors = ErrorOutput
+            If HasErrorOutput Then
+                If conditionHasErrors Then conditionErrors = conditionErrors & vbCrLf
+                conditionErrors = conditionErrors & termErrors
+                conditionHasErrors = True
+            End If
             If HasOutput Then
                 If conditionHasOutput And Not conditionSuppressNewline Then
                     conditionOutput = conditionOutput & vbCrLf
@@ -268,6 +310,8 @@ Private Function EvaluateCondition(ByVal tokens As Collection, ByVal firstIndex 
             End If
         End If
         HasOutput = False
+        ErrorOutput = ""
+        HasErrorOutput = False
         SuppressNewline = False
 
         If operatorIndex = 0 Then Exit Do
@@ -288,8 +332,8 @@ Private Function ExecuteConditionTerm(ByVal tokens As Collection, ByVal original
     Exit Function
 
 CommandError:
-    ExecuteConditionTerm = "VBAsh: " & Err.Description
-    HasOutput = True
+    ErrorOutput = "VBAsh: " & Err.Description
+    HasErrorOutput = True
     SuppressNewline = False
     If Err.Number >= vbObjectError + 1000 And Err.Number < vbObjectError + 2000 Then
         LastExitCode = 2
@@ -416,33 +460,103 @@ Public Function IsValidEnvironmentName(ByVal name As String) As Boolean
     IsValidEnvironmentName = True
 End Function
 
-Private Sub ApplyOutputRedirection(ByVal command As clsCommand, ByVal output As String)
+Private Sub ApplyRedirections(ByVal command As clsCommand, ByVal output As String, _
+                              ByVal errorText As String)
     Dim redirection As clsRedirection
+    Dim stdoutType As String
+    Dim stdoutPath As String
+    Dim stdoutAppend As Boolean
+    Dim stderrType As String
+    Dim stderrPath As String
+    Dim stderrAppend As Boolean
+    Dim redirectPath As String
+
+    stdoutType = "CONSOLE"
+    stderrType = "CONSOLE"
+    For Each redirection In command.Redirections
+        Select Case redirection.Operator
+            Case "REDIR_OUT", "REDIR_APPEND", "REDIR_ERR", "REDIR_ERR_APPEND"
+                redirectPath = redirection.Target
+                If Len(redirectPath) = 0 Then
+                    Err.Raise vbObjectError + 1027, "clsSession", "Destino de redirecionamento vazio."
+                End If
+                If StrComp(redirectPath, "/dev/null", vbTextCompare) = 0 Or _
+                   StrComp(redirectPath, "NUL", vbTextCompare) = 0 Then
+                    If Left$(redirection.Operator, 9) = "REDIR_ERR" Then
+                        stderrType = "DISCARD"
+                    Else
+                        stdoutType = "DISCARD"
+                    End If
+                Else
+                    redirectPath = ResolvePath(redirectPath)
+                    If redirection.Operator = "REDIR_OUT" Or redirection.Operator = "REDIR_ERR" Then
+                        TruncateOutputFile redirectPath
+                    Else
+                        EnsureOutputFile redirectPath
+                    End If
+                    If Left$(redirection.Operator, 9) = "REDIR_ERR" Then
+                        stderrType = "FILE"
+                        stderrPath = redirectPath
+                        stderrAppend = (redirection.Operator = "REDIR_ERR_APPEND")
+                    Else
+                        stdoutType = "FILE"
+                        stdoutPath = redirectPath
+                        stdoutAppend = (redirection.Operator = "REDIR_APPEND")
+                    End If
+                End If
+            Case "REDIR_DISCARD"
+                stdoutType = "DISCARD"
+            Case "REDIR_ERR_DISCARD"
+                stderrType = "DISCARD"
+            Case "REDIR_ERR_TO_OUT"
+                stderrType = stdoutType
+                stderrPath = stdoutPath
+                stderrAppend = (stdoutType = "FILE")
+        End Select
+    Next redirection
+
+    RouteOutput stdoutType, stdoutPath, stdoutAppend, output, HasOutput, SuppressNewline
+    RouteOutput stderrType, stderrPath, stderrAppend, errorText, HasErrorOutput, False
+    If stdoutType <> "CONSOLE" Then HasOutput = False
+    If stderrType <> "CONSOLE" Then
+        HasErrorOutput = False
+        ErrorOutput = ""
+    End If
+End Sub
+
+Private Sub RouteOutput(ByVal destinationType As String, ByVal destinationPath As String, _
+                        ByVal append As Boolean, ByVal text As String, ByVal hasText As Boolean, _
+                        ByVal suppressNewline As Boolean)
     Dim stream As clsFileStream
-    Dim text As String
+    Dim content As String
 
-    If command.Redirections.Count > 1 Then
-        Err.Raise vbObjectError + 1025, "clsSession", "Apenas um redirecionamento é suportado."
-    End If
+    If destinationType = "CONSOLE" Or destinationType = "DISCARD" Then Exit Sub
+    If Not hasText Then Exit Sub
 
-    Set redirection = command.Redirections(1)
-    If redirection.Operator = "REDIR_DISCARD" Or _
-       StrComp(redirection.Target, "/dev/null", vbTextCompare) = 0 Or _
-       StrComp(redirection.Target, "NUL", vbTextCompare) = 0 Then
-        Exit Sub
-    End If
-    If redirection.Operator <> "REDIR_OUT" And redirection.Operator <> "REDIR_APPEND" Then
-        Err.Raise vbObjectError + 1026, "clsSession", "Apenas redirecionamento de saída é suportado."
-    End If
-    If Len(redirection.Target) = 0 Then
-        Err.Raise vbObjectError + 1027, "clsSession", "Destino de redirecionamento vazio."
-    End If
-
-    text = output
-    If Not SuppressNewline Then text = text & vbCrLf
+    content = text
+    If Not suppressNewline Then content = content & vbCrLf
     Set stream = New clsFileStream
-    stream.OpenForWrite ResolvePath(redirection.Target), redirection.Operator = "REDIR_APPEND"
-    stream.WriteText text
+    stream.OpenForWrite destinationPath, append
+    stream.WriteText content
+    stream.CloseStream
+End Sub
+
+Private Sub TruncateOutputFile(ByVal path As String)
+    Dim stream As clsFileStream
+
+    Set stream = New clsFileStream
+    stream.OpenForWrite path
+    stream.CloseStream
+End Sub
+
+Private Sub EnsureOutputFile(ByVal path As String)
+    Dim fileSystem As Object
+    Dim stream As clsFileStream
+
+    Set fileSystem = CreateObject("Scripting.FileSystemObject")
+    If fileSystem.FileExists(path) Then Exit Sub
+    Set stream = New clsFileStream
+    stream.OpenForWrite path
     stream.CloseStream
 End Sub
 

@@ -69,6 +69,30 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
             GoTo ContinueLoop
         End If
 
+        If Mid$(mSource, mIndex, 4) = "2>&1" Then
+            AddToken Tokenize, "REDIR_ERR_TO_OUT", "2>&1"
+            mIndex = mIndex + 4
+            GoTo ContinueLoop
+        End If
+
+        If Mid$(mSource, mIndex, 4) = "2>&-" Then
+            AddToken Tokenize, "REDIR_ERR_DISCARD", "2>&-"
+            mIndex = mIndex + 4
+            GoTo ContinueLoop
+        End If
+
+        If Mid$(mSource, mIndex, 3) = "2>>" Then
+            AddToken Tokenize, "REDIR_ERR_APPEND", "2>>"
+            mIndex = mIndex + 3
+            GoTo ContinueLoop
+        End If
+
+        If Mid$(mSource, mIndex, 2) = "2>" Then
+            AddToken Tokenize, "REDIR_ERR", "2>"
+            mIndex = mIndex + 2
+            GoTo ContinueLoop
+        End If
+
         If ch = "<" Then
             AddToken Tokenize, "REDIR_IN", "<"
             mIndex = mIndex + 1

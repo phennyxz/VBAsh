@@ -410,10 +410,12 @@ Private Function VBAshFormCommandCode() As String
         "Private Sub SubmitCommand()", _
         "    Dim commandLine As String", _
         "    Dim result As String", _
+        "    Dim errorText As String", _
         "    commandLine = mCommandInput.Text", _
         "    mCommandInput.Text = """"", _
         "    If Len(Trim$(commandLine)) = 0 Then Exit Sub", _
         "    result = gSession.ProcessInput(commandLine)", _
+        "    errorText = gSession.ErrorOutput", _
         "    If gSession.ClearRequested Then", _
         "        mOutput.Value = """"", _
         "    Else", _
@@ -421,6 +423,9 @@ Private Function VBAshFormCommandCode() As String
         "        If gSession.HasOutput Then", _
         "            mOutput.Value = mOutput.Value & result", _
         "            If Not gSession.SuppressNewline Then mOutput.Value = mOutput.Value & vbCrLf", _
+        "        End If", _
+        "        If gSession.HasErrorOutput Then", _
+        "            mOutput.Value = mOutput.Value & errorText & vbCrLf", _
         "        End If", _
         "    End If", _
         "    mPrompt.Caption = gSession.Prompt", _
