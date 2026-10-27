@@ -56,7 +56,10 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
         End If
 
         If ch = ">" Then
-            If Mid$(mSource, mIndex + 1, 1) = ">" Then
+            If Mid$(mSource, mIndex + 1, 2) = "&-" Then
+                AddToken Tokenize, "REDIR_DISCARD", ">&-"
+                mIndex = mIndex + 3
+            ElseIf Mid$(mSource, mIndex + 1, 1) = ">" Then
                 AddToken Tokenize, "REDIR_APPEND", ">>"
                 mIndex = mIndex + 2
             Else

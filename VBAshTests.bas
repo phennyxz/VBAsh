@@ -50,6 +50,10 @@ Private Sub TestTokenizer()
     Set tokens = tokenizer.Tokenize("echo ""a && b""")
     Set token = tokens(2)
     AssertEqual "a && b", token.Value, "logical operators remain literal inside quotes"
+
+    Set tokens = tokenizer.Tokenize("echo hidden>&-")
+    Set token = tokens(3)
+    AssertEqual "REDIR_DISCARD", token.TokenType, "close-output redirection token"
 End Sub
 
 Private Sub TestEcho()
@@ -240,6 +244,12 @@ Private Sub TestConditionals()
         session.ProcessInput( _
             "if command-does-not-exist; then echo no; else echo fallback; fi"), _
         "if selects else for a command with nonzero status"
+    AssertEqual "ok", session.ProcessInput( _
+        "if ls . >&-; then echo ok; else echo no; fi"), _
+        "if preserves command success when stdout is closed"
+    AssertEqual "ok", session.ProcessInput( _
+        "if ls . > /dev/null; then echo ok; else echo no; fi"), _
+        "if redirects output to the null device without changing status"
 
     session.ProcessInput "if [ -d .; then echo invalid; fi"
     AssertEqual 2, session.LastExitCode, "if rejects missing closing bracket"
@@ -272,6 +282,14 @@ Private Sub TestErrorsAndExitStatus()
 
     session.ProcessInput "echo hi < input.txt"
     AssertEqual 2, session.LastExitCode, "unsupported input redirection status"
+
+    session.ProcessInput "ls . >&-"
+    AssertEqual 0, session.LastExitCode, "close-output redirection preserves command status"
+    AssertTrue Not session.HasOutput, "close-output redirection discards command output"
+
+    session.ProcessInput "echo null-device > /dev/null"
+    AssertEqual 0, session.LastExitCode, "null-device redirection succeeds"
+    AssertTrue Not session.HasOutput, "null-device redirection suppresses output"
 
     Set session = New clsSession
     session.ProcessInput "exit 5"

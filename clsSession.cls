@@ -426,6 +426,11 @@ Private Sub ApplyOutputRedirection(ByVal command As clsCommand, ByVal output As 
     End If
 
     Set redirection = command.Redirections(1)
+    If redirection.Operator = "REDIR_DISCARD" Or _
+       StrComp(redirection.Target, "/dev/null", vbTextCompare) = 0 Or _
+       StrComp(redirection.Target, "NUL", vbTextCompare) = 0 Then
+        Exit Sub
+    End If
     If redirection.Operator <> "REDIR_OUT" And redirection.Operator <> "REDIR_APPEND" Then
         Err.Raise vbObjectError + 1026, "clsSession", "Apenas redirecionamento de saída é suportado."
     End If

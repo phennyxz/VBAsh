@@ -38,6 +38,14 @@ Public Function Parse(ByVal tokens As Collection, ByVal originalText As String) 
                 Set redirection = New clsRedirection
                 redirection.Operator = token.TokenType
                 expectsTarget = True
+            Case "REDIR_DISCARD"
+                If Not hasName Then
+                    Err.Raise vbObjectError + 1004, "clsParser.Parse", "Comando vazio antes do redirecionamento."
+                End If
+                Set redirection = New clsRedirection
+                redirection.Operator = token.TokenType
+                redirection.Target = "-"
+                command.AddRedirection redirection
             Case Else
                 Err.Raise vbObjectError + 1001, "clsParser.Parse", _
                     "Operador ainda não suportado: " & token.Value
