@@ -200,7 +200,21 @@ Private Sub TestConditionals()
     AssertEqual 1, session.LastExitCode, "test false status"
     session.ProcessInput "test ""same value"" = ""same value"""
     AssertEqual 0, session.LastExitCode, "test compares quoted strings"
-    AssertEqual 7, session.History.Count, "conditional internals do not duplicate history"
+    session.ProcessInput "test 7 -eq 7"
+    AssertEqual 0, session.LastExitCode, "test supports numeric equality"
+    session.ProcessInput "test 7 -ne 3"
+    AssertEqual 0, session.LastExitCode, "test supports numeric inequality"
+    session.ProcessInput "test 7 -gt 3"
+    AssertEqual 0, session.LastExitCode, "test supports numeric greater-than"
+    session.ProcessInput "test 7 -ge 7"
+    AssertEqual 0, session.LastExitCode, "test supports numeric greater-or-equal"
+    session.ProcessInput "test 3 -lt 7"
+    AssertEqual 0, session.LastExitCode, "test supports numeric less-than"
+    session.ProcessInput "test 7 -le 3"
+    AssertEqual 1, session.LastExitCode, "test reports false numeric comparison"
+    session.ProcessInput "test value -eq 7"
+    AssertEqual 2, session.LastExitCode, "test rejects nonnumeric comparison operands"
+    AssertEqual 14, session.History.Count, "conditional internals do not duplicate history"
 
     AssertEqual "bracket", session.ProcessInput( _
         "if [ -d . ] && [ -n ok ]; then echo bracket; else echo no; fi"), _
@@ -217,6 +231,15 @@ Private Sub TestConditionals()
     AssertEqual "short-circuit", session.ProcessInput( _
         "if [ -e __vbash_missing_path__ ] && [ -q x ]; then echo no; else echo short-circuit; fi"), _
         "and-if skips a false condition's right side"
+    AssertEqual session.CurrentDirectory & vbCrLf & "command", session.ProcessInput( _
+        "if pwd; then echo command; fi"), "if evaluates a command and preserves its output"
+    AssertTrue Right$(session.ProcessInput("if ls .; then echo command; fi"), _
+        Len(vbCrLf & "command")) = vbCrLf & "command", _
+        "if accepts ls as a command condition"
+    AssertEqual "Command not found: command-does-not-exist" & vbCrLf & "fallback", _
+        session.ProcessInput( _
+            "if command-does-not-exist; then echo no; else echo fallback; fi"), _
+        "if selects else for a command with nonzero status"
 
     session.ProcessInput "if [ -d .; then echo invalid; fi"
     AssertEqual 2, session.LastExitCode, "if rejects missing closing bracket"

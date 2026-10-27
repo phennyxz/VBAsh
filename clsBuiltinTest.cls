@@ -7,6 +7,8 @@ Private Function IBuiltin_Execute(ByVal session As clsSession, ByVal args As Col
     Dim value As String
     Dim path As String
     Dim isTrue As Boolean
+    Dim leftNumber As Double
+    Dim rightNumber As Double
 
     Select Case args.Count
         Case 0
@@ -44,6 +46,27 @@ Private Function IBuiltin_Execute(ByVal session As clsSession, ByVal args As Col
                     isTrue = (StrComp(value, CStr(args(3)), vbBinaryCompare) = 0)
                 Case "!="
                     isTrue = (StrComp(value, CStr(args(3)), vbBinaryCompare) <> 0)
+                Case "-eq", "-ne", "-gt", "-ge", "-lt", "-le"
+                    If Not IsNumeric(value) Or Not IsNumeric(CStr(args(3))) Then
+                        Err.Raise vbObjectError + 1041, "clsBuiltinTest", _
+                            "Os operandos de " & testOperator & " devem ser numéricos."
+                    End If
+                    leftNumber = CDbl(value)
+                    rightNumber = CDbl(CStr(args(3)))
+                    Select Case testOperator
+                        Case "-eq"
+                            isTrue = (leftNumber = rightNumber)
+                        Case "-ne"
+                            isTrue = (leftNumber <> rightNumber)
+                        Case "-gt"
+                            isTrue = (leftNumber > rightNumber)
+                        Case "-ge"
+                            isTrue = (leftNumber >= rightNumber)
+                        Case "-lt"
+                            isTrue = (leftNumber < rightNumber)
+                        Case "-le"
+                            isTrue = (leftNumber <= rightNumber)
+                    End Select
                 Case Else
                     Err.Raise vbObjectError + 1041, "clsBuiltinTest", _
                         "Operador de teste não suportado: " & testOperator

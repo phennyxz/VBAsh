@@ -142,6 +142,12 @@ Private Function ExecuteIf(ByVal tokens As Collection, ByVal originalText As Str
     Dim elseSeparator As Long
     Dim markerIndex As Long
     Dim conditionStatus As Long
+    Dim conditionOutput As String
+    Dim conditionHasOutput As Boolean
+    Dim conditionSuppressNewline As Boolean
+    Dim branchOutput As String
+    Dim branchHasOutput As Boolean
+    Dim branchSuppressNewline As Boolean
 
     conditionStart = 2
     firstSeparator = FindToken(tokens, "SEMI", conditionStart)
@@ -188,22 +194,40 @@ Private Function ExecuteIf(ByVal tokens As Collection, ByVal originalText As Str
         Err.Raise vbObjectError + 1031, "clsSession.if", "Texto inesperado após 'fi'."
     End If
 
-    conditionStatus = EvaluateCondition(tokens, conditionStart, conditionEnd, originalText)
+    conditionStatus = EvaluateCondition(tokens, conditionStart, conditionEnd, originalText, _
+                                        conditionOutput, conditionHasOutput, conditionSuppressNewline)
     LastExitCode = conditionStatus
     HasOutput = False
     SuppressNewline = False
 
     If conditionStatus = 0 Then
-        ExecuteIf = ExecuteTokens(TokenRange(tokens, thenStart, thenEnd), originalText)
+        branchOutput = ExecuteTokens(TokenRange(tokens, thenStart, thenEnd), originalText)
+        branchHasOutput = HasOutput
+        branchSuppressNewline = SuppressNewline
     ElseIf elseStart > 0 Then
-        ExecuteIf = ExecuteTokens(TokenRange(tokens, elseStart, elseEnd), originalText)
+        branchOutput = ExecuteTokens(TokenRange(tokens, elseStart, elseEnd), originalText)
+        branchHasOutput = HasOutput
+        branchSuppressNewline = SuppressNewline
     Else
         LastExitCode = 0
+    End If
+
+    If conditionHasOutput And branchHasOutput And Not conditionSuppressNewline Then
+        conditionOutput = conditionOutput & vbCrLf
+    End If
+    ExecuteIf = conditionOutput & branchOutput
+    HasOutput = conditionHasOutput Or branchHasOutput
+    If branchHasOutput Then
+        SuppressNewline = branchSuppressNewline
+    Else
+        SuppressNewline = conditionSuppressNewline
     End If
 End Function
 
 Private Function EvaluateCondition(ByVal tokens As Collection, ByVal firstIndex As Long, _
-                                   ByVal lastIndex As Long, ByVal originalText As String) As Long
+                                   ByVal lastIndex As Long, ByVal originalText As String, _
+                                   ByRef conditionOutput As String, ByRef conditionHasOutput As Boolean, _
+                                   ByRef conditionSuppressNewline As Boolean) As Long
     Dim termStart As Long
     Dim termEnd As Long
     Dim operatorIndex As Long
@@ -212,6 +236,7 @@ Private Function EvaluateCondition(ByVal tokens As Collection, ByVal firstIndex 
     Dim shouldExecute As Boolean
     Dim termTokens As Collection
     Dim token As clsToken
+    Dim termOutput As String
 
     termStart = firstIndex
     Do
@@ -231,8 +256,16 @@ Private Function EvaluateCondition(ByVal tokens As Collection, ByVal firstIndex 
         If pendingOperator = "OR_IF" And currentStatus <> 0 Then shouldExecute = True
 
         If shouldExecute Then
-            ExecuteTokens termTokens, originalText
+            termOutput = ExecuteConditionTerm(termTokens, originalText)
             currentStatus = LastExitCode
+            If HasOutput Then
+                If conditionHasOutput And Not conditionSuppressNewline Then
+                    conditionOutput = conditionOutput & vbCrLf
+                End If
+                conditionOutput = conditionOutput & termOutput
+                conditionHasOutput = True
+                conditionSuppressNewline = SuppressNewline
+            End If
         End If
         HasOutput = False
         SuppressNewline = False
@@ -247,6 +280,22 @@ Private Function EvaluateCondition(ByVal tokens As Collection, ByVal firstIndex 
     Loop
 
     EvaluateCondition = currentStatus
+End Function
+
+Private Function ExecuteConditionTerm(ByVal tokens As Collection, ByVal originalText As String) As String
+    On Error GoTo CommandError
+    ExecuteConditionTerm = ExecuteTokens(tokens, originalText)
+    Exit Function
+
+CommandError:
+    ExecuteConditionTerm = "VBAsh: " & Err.Description
+    HasOutput = True
+    SuppressNewline = False
+    If Err.Number >= vbObjectError + 1000 And Err.Number < vbObjectError + 2000 Then
+        LastExitCode = 2
+    Else
+        LastExitCode = 1
+    End If
 End Function
 
 Private Function FindConditionOperator(ByVal tokens As Collection, ByVal firstIndex As Long, _
@@ -293,7 +342,10 @@ Private Function ConditionTerm(ByVal tokens As Collection, ByVal firstIndex As L
             result.Add firstToken
         Next i
     Else
-        Err.Raise vbObjectError + 1033, "clsSession.if", "Esperado 'test' ou '[ expressão ]' na condição."
+        For i = firstIndex To lastIndex
+            Set firstToken = tokens(i)
+            result.Add firstToken
+        Next i
     End If
 
     Set firstToken = New clsToken
