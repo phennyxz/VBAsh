@@ -418,7 +418,8 @@ Private Function VBAshFormCommandCode() As String
         "    errorText = gSession.ErrorOutput", _
         "    If gSession.ClearRequested Then", _
         "        mOutput.Value = """"", _
-        "    Else", _
+        "    Else"), vbCrLf)
+    VBAshFormCommandCode = VBAshFormCommandCode & vbCrLf & Join(Array( _
         "        mOutput.Value = mOutput.Value & mPrompt.Caption & commandLine & vbCrLf", _
         "        If gSession.HasOutput Then", _
         "            mOutput.Value = mOutput.Value & result", _

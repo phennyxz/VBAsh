@@ -60,6 +60,9 @@ Private Sub TestTokenizer()
     AssertEqual "REDIR_ERR", token.TokenType, "stderr redirection token"
     Set token = tokens(5)
     AssertEqual "REDIR_ERR_TO_OUT", token.TokenType, "stderr-to-stdout token"
+    Set tokens = tokenizer.Tokenize("pwd 2>&-")
+    Set token = tokens(2)
+    AssertEqual "REDIR_ERR_DISCARD", token.TokenType, "close-stderr redirection token"
 End Sub
 
 Private Sub TestEcho()
@@ -353,6 +356,10 @@ Private Sub TestRedirection()
     contents = textStream.ReadAll
     textStream.Close
     AssertEqual "", contents, "successful stderr redirection creates an empty file"
+    AssertEqual session.CurrentDirectory, session.ProcessInput("pwd 2>&1"), _
+        "stderr-to-stdout leaves successful stdout visible"
+    AssertTrue session.HasOutput, "successful merged stdout remains visible"
+    AssertTrue Not session.HasErrorOutput, "successful merged command emits no stderr"
 
     session.ProcessInput "pwd extra 2> """ & errorPath & """"
     AssertEqual 2, session.LastExitCode, "failed command status with stderr redirection"
@@ -394,6 +401,9 @@ Private Sub TestRedirection()
     textStream.Close
     AssertEqual "Command not found: missing-command" & vbCrLf, _
         contents, "unknown command message is stderr"
+    session.ProcessInput "pwd extra 2>&-"
+    AssertEqual 2, session.LastExitCode, "discarding stderr preserves the command status"
+    AssertTrue Not session.HasErrorOutput, "2>&- discards stderr"
 
     fileSystem.DeleteFile errorPath, True
     fileSystem.DeleteFile mergePath, True
