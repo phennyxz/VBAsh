@@ -141,6 +141,7 @@ Private Function ExecuteTokens(ByVal tokens As Collection, ByVal originalText As
 BuiltinError:
     errorNumber = Err.Number
     errorDescription = Err.Description
+    HasOutput = False
     ErrorOutput = "VBAsh: " & errorDescription
     HasErrorOutput = True
     If errorNumber >= vbObjectError + 1000 And errorNumber < vbObjectError + 2000 Then
@@ -470,6 +471,10 @@ Private Sub ApplyRedirections(ByVal command As clsCommand, ByVal output As Strin
     Dim stderrPath As String
     Dim stderrAppend As Boolean
     Dim redirectPath As String
+    Dim mergedText As String
+    Dim mergedHasOutput As Boolean
+    Dim mergedAppend As Boolean
+    Dim mergedSuppressNewline As Boolean
 
     stdoutType = "CONSOLE"
     stderrType = "CONSOLE"
@@ -515,8 +520,24 @@ Private Sub ApplyRedirections(ByVal command As clsCommand, ByVal output As Strin
         End Select
     Next redirection
 
-    RouteOutput stdoutType, stdoutPath, stdoutAppend, output, HasOutput, SuppressNewline
-    RouteOutput stderrType, stderrPath, stderrAppend, errorText, HasErrorOutput, False
+    If stdoutType = "FILE" And stderrType = "FILE" And _
+       StrComp(stdoutPath, stderrPath, vbTextCompare) = 0 Then
+        mergedText = output
+        mergedHasOutput = HasOutput
+        mergedAppend = stdoutAppend
+        mergedSuppressNewline = SuppressNewline
+        If HasErrorOutput Then
+            If mergedHasOutput And Not mergedSuppressNewline Then mergedText = mergedText & vbCrLf
+            mergedText = mergedText & errorText
+            mergedHasOutput = True
+            mergedSuppressNewline = False
+        End If
+        RouteOutput "FILE", stdoutPath, mergedAppend, mergedText, _
+                    mergedHasOutput, mergedSuppressNewline
+    Else
+        RouteOutput stdoutType, stdoutPath, stdoutAppend, output, HasOutput, SuppressNewline
+        RouteOutput stderrType, stderrPath, stderrAppend, errorText, HasErrorOutput, False
+    End If
     If stdoutType <> "CONSOLE" Then HasOutput = False
     If stderrType <> "CONSOLE" Then
         HasErrorOutput = False
