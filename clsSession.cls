@@ -164,6 +164,9 @@ Private Function ExecuteFor(ByVal tokens As Collection, ByVal originalText As St
     Dim markerIndex As Long
     Dim variableName As String
     Dim valueToken As clsToken
+    Dim loopValues As Collection
+    Dim expandedValues As Collection
+    Dim loopValue As Variant
     Dim bodyTokens As Collection
     Dim i As Long
     Dim output As String
@@ -201,6 +204,13 @@ Private Function ExecuteFor(ByVal tokens As Collection, ByVal originalText As St
         If valueToken.TokenType <> "WORD" Then
             Err.Raise vbObjectError + 1074, "clsSession.for", "Valores inválidos no for."
         End If
+        Set expandedValues = ExpandBraceRange(valueToken)
+        If loopValues Is Nothing Then
+            Set loopValues = New Collection
+        End If
+        For Each loopValue In expandedValues
+            loopValues.Add CStr(loopValue)
+        Next loopValue
     Next i
 
     bodyStart = listSeparator + 2
@@ -215,33 +225,96 @@ Private Function ExecuteFor(ByVal tokens As Collection, ByVal originalText As St
     End If
     Set bodyTokens = TokenRange(tokens, bodyStart, bodyEnd)
 
-    For i = 4 To listSeparator - 1
-        Set valueToken = tokens(i)
-        SetEnv variableName, ExpandVariableText(valueToken.Value, valueToken.ExpansionMask)
-        commandOutput = ExecuteTokens(bodyTokens, originalText)
-        commandHasOutput = HasOutput
-        commandHasErrors = HasErrorOutput
-        commandError = ErrorOutput
+    If Not loopValues Is Nothing Then
+        For Each loopValue In loopValues
+            SetEnv variableName, CStr(loopValue)
+            commandOutput = ExecuteTokens(bodyTokens, originalText)
+            commandHasOutput = HasOutput
+            commandHasErrors = HasErrorOutput
+            commandError = ErrorOutput
 
-        If commandHasOutput Then
-            If hasOutput And Not suppressNewline Then output = output & vbCrLf
-            output = output & commandOutput
-            hasOutput = True
-            suppressNewline = SuppressNewline
-        End If
-        If commandHasErrors Then
-            If hasErrors Then errorText = errorText & vbCrLf
-            errorText = errorText & commandError
-            hasErrors = True
-        End If
-    Next i
+            If commandHasOutput Then
+                If hasOutput And Not suppressNewline Then output = output & vbCrLf
+                output = output & commandOutput
+                hasOutput = True
+                suppressNewline = SuppressNewline
+            End If
+            If commandHasErrors Then
+                If hasErrors Then errorText = errorText & vbCrLf
+                errorText = errorText & commandError
+                hasErrors = True
+            End If
+        Next loopValue
+    End If
 
-    If listSeparator = 4 Then LastExitCode = 0
+    If loopValues Is Nothing Then LastExitCode = 0
     ExecuteFor = output
-    HasOutput = hasOutput
+    HasOutput = hasOutput Or Len(output) > 0
     SuppressNewline = suppressNewline
     ErrorOutput = errorText
     HasErrorOutput = hasErrors
+End Function
+
+Private Function ExpandBraceRange(ByVal token As clsToken) As Collection
+    Dim values As New Collection
+    Dim rangeText As String
+    Dim separator As Long
+    Dim firstValue As Long
+    Dim lastValue As Long
+    Dim firstNumber As Double
+    Dim lastNumber As Double
+    Dim stepValue As Long
+    Dim currentValue As Long
+    Dim itemCount As Long
+
+    If Not token.BraceExpansionAllowed Or Left$(token.Value, 1) <> "{" Or _
+       Right$(token.Value, 1) <> "}" Then
+        values.Add ExpandVariableText(token.Value, token.ExpansionMask)
+        Set ExpandBraceRange = values
+        Exit Function
+    End If
+
+    rangeText = Mid$(token.Value, 2, Len(token.Value) - 2)
+    separator = InStr(1, rangeText, "..", vbBinaryCompare)
+    If separator = 0 Then
+        values.Add ExpandVariableText(token.Value, token.ExpansionMask)
+        Set ExpandBraceRange = values
+        Exit Function
+    End If
+
+    If Not IsNumeric(Left$(rangeText, separator - 1)) Or _
+       Not IsNumeric(Mid$(rangeText, separator + 2)) Then
+        values.Add ExpandVariableText(token.Value, token.ExpansionMask)
+        Set ExpandBraceRange = values
+        Exit Function
+    End If
+
+    firstNumber = CDbl(Left$(rangeText, separator - 1))
+    lastNumber = CDbl(Mid$(rangeText, separator + 2))
+    If firstNumber <> Fix(firstNumber) Or lastNumber <> Fix(lastNumber) Then
+        values.Add ExpandVariableText(token.Value, token.ExpansionMask)
+        Set ExpandBraceRange = values
+        Exit Function
+    End If
+    If firstNumber < -1000 Or firstNumber > 1000 Or lastNumber < -1000 Or lastNumber > 1000 Then
+        Err.Raise vbObjectError + 1077, "clsSession.for", "Intervalo brace grande demais."
+    End If
+    firstValue = CLng(firstNumber)
+    lastValue = CLng(lastNumber)
+    If firstValue <= lastValue Then
+        stepValue = 1
+    Else
+        stepValue = -1
+    End If
+
+    currentValue = firstValue
+    Do
+        values.Add CStr(currentValue)
+        itemCount = itemCount + 1
+        If itemCount >= 1000 Or currentValue = lastValue Then Exit Do
+        currentValue = currentValue + stepValue
+    Loop
+    Set ExpandBraceRange = values
 End Function
 
 Private Function ExecuteIf(ByVal tokens As Collection, ByVal originalText As String) As String
@@ -362,9 +435,11 @@ Private Function ExpandTokens(ByVal tokens As Collection) As Collection
         Set expandedToken = New clsToken
         If token.TokenType = "WORD" Then
             expandedToken.Init token.TokenType, _
-                ExpandVariableText(token.Value, token.ExpansionMask), token.ExpansionMask
+                ExpandVariableText(token.Value, token.ExpansionMask), token.ExpansionMask, _
+                token.BraceExpansionAllowed
         Else
-            expandedToken.Init token.TokenType, token.Value, token.ExpansionMask
+            expandedToken.Init token.TokenType, token.Value, token.ExpansionMask, _
+                token.BraceExpansionAllowed
         End If
         result.Add expandedToken
     Next i

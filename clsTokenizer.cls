@@ -114,9 +114,11 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
         Dim buffer As String
         Dim bufferMask As String
         Dim hasWord As Boolean
+        Dim braceExpansionAllowed As Boolean
         buffer = ""
         bufferMask = ""
         hasWord = False
+        braceExpansionAllowed = True
 
         Do While mIndex <= mLen
             ch = Mid$(mSource, mIndex, 1)
@@ -129,6 +131,7 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
             If ch = "'" Or ch = """" Then
                 Dim quoteCh As String
                 Dim quoteClosed As Boolean
+                braceExpansionAllowed = False
                 quoteCh = ch
                 quoteClosed = False
                 hasWord = True
@@ -169,6 +172,7 @@ ContinueQuoted:
             End If
 
             If ch = "\" And mIndex < mLen Then
+                braceExpansionAllowed = False
                 mIndex = mIndex + 1
                 buffer = buffer & Mid$(mSource, mIndex, 1)
                 bufferMask = bufferMask & IIf(Mid$(mSource, mIndex, 1) = "$", "0", "1")
@@ -185,7 +189,7 @@ ContinueWord:
         Loop
 
         If hasWord Then
-            AddToken Tokenize, "WORD", buffer, bufferMask
+            AddToken Tokenize, "WORD", buffer, bufferMask, braceExpansionAllowed
         End If
 
 ContinueLoop:
@@ -195,9 +199,10 @@ ContinueLoop:
 End Function
 
 Private Sub AddToken(ByVal tokenList As Collection, ByVal tokenType As String, _
-                     ByVal tokenValue As String, Optional ByVal expansionMask As String = "")
+                     ByVal tokenValue As String, Optional ByVal expansionMask As String = "", _
+                     Optional ByVal braceExpansionAllowed As Boolean = True)
     Dim token As clsToken
     Set token = New clsToken
-    token.Init tokenType, tokenValue, expansionMask
+    token.Init tokenType, tokenValue, expansionMask, braceExpansionAllowed
     tokenList.Add token
 End Sub

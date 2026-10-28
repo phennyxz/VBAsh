@@ -65,13 +65,19 @@ Private Sub TestTokenizer()
     Set token = tokens(2)
     AssertEqual "REDIR_ERR_DISCARD", token.TokenType, "close-stderr redirection token"
 
-    Set tokens = tokenizer.Tokenize("echo '$a' ""$a"" \$a")
+    Set tokens = tokenizer.Tokenize("echo '$a'")
     Set token = tokens(2)
-    AssertEqual "00", Left$(token.ExpansionMask, 2), "single quotes disable variable expansion"
-    Set token = tokens(3)
+    AssertEqual "00", token.ExpansionMask, "single quotes disable variable expansion"
+    Set tokens = tokenizer.Tokenize("echo ""$a""")
+    Set token = tokens(2)
     AssertEqual "11", token.ExpansionMask, "double quotes allow variable expansion"
-    Set token = tokens(4)
+    Set tokens = tokenizer.Tokenize("echo \$a")
+    Set token = tokens(2)
     AssertEqual "01", token.ExpansionMask, "escaped dollar disables variable expansion"
+    AssertTrue Not token.BraceExpansionAllowed, "escaped words disable brace expansion"
+    Set tokens = tokenizer.Tokenize("echo ""{1..3}""")
+    Set token = tokens(2)
+    AssertTrue Not token.BraceExpansionAllowed, "quoted words disable brace expansion"
 End Sub
 
 Private Sub TestForLoops()
@@ -81,15 +87,28 @@ Private Sub TestForLoops()
     AssertEqual "1" & vbCrLf & "2" & vbCrLf & "3", _
         session.ProcessInput("for a in 1 2 3; do echo $a; done"), _
         "for iterates over values and expands loop variable"
-    AssertEqual "3", session.GetEnv("a"), "for leaves loop variable at final value"
-    AssertEqual "value=3", session.ProcessInput("echo ""value=$a"""), _
+    AssertTrue session.HasOutput, "for reports its body output to the terminal"
+    AssertEqual "1" & vbCrLf & "2" & vbCrLf & "3" & vbCrLf & "4" & vbCrLf & _
+        "5" & vbCrLf & "6" & vbCrLf & "7", _
+        session.ProcessInput("for a in {1..7}; do echo $a; done"), _
+        "for expands ascending brace ranges"
+    AssertEqual "7", session.GetEnv("a"), "for leaves loop variable at final range value"
+    AssertEqual "value=7", session.ProcessInput("echo ""value=$a"""), _
         "double-quoted variable expansion"
-    AssertEqual "value=3", session.ProcessInput("echo value=${a}"), _
+    AssertEqual "value=7", session.ProcessInput("echo value=${a}"), _
         "braced variable expansion"
     AssertEqual "$a", session.ProcessInput("echo '$a'"), _
         "single-quoted variable remains literal"
     AssertEqual "$a", session.ProcessInput("echo \$a"), _
         "escaped variable remains literal"
+    AssertEqual "3" & vbCrLf & "2" & vbCrLf & "1", _
+        session.ProcessInput("for a in {3..1}; do echo $a; done"), _
+        "for expands descending brace ranges"
+    AssertEqual "{1..3}", session.ProcessInput( _
+        "for a in ""{1..3}""; do echo $a; done"), _
+        "for does not expand quoted brace ranges"
+    session.ProcessInput "for a in {1..1001}; do echo invalid; done"
+    AssertEqual 2, session.LastExitCode, "for rejects excessively large brace ranges"
     AssertEqual "", session.ProcessInput("for item in; do echo not-run; done"), _
         "for with no values skips its body"
     AssertEqual 0, session.LastExitCode, "empty for loop status"
