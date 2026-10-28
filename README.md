@@ -15,6 +15,7 @@ Um shell mínimo implementado em VBA. A versão atual executa builtins fundament
 - `unset NOME [NOME ...]`
 - `test` ou `[ expressão ]` com testes (`-n`, `-z`, `-d`, `-f`, `-e`, `=`, `==`, `!=`, `-eq`, `-ne`, `-gt`, `-ge`, `-lt`, `-le`)
 - `if comando; then comando; [else comando;] fi` em uma única linha; condições aceitam comandos ou testes simples encadeados com `&&` e `||`, avaliados da esquerda para a direita
+- `for NOME in valores; do comando; done` em uma única linha, com expansão básica de `$NOME`
 - `help`
 - `exit [status]`
 
@@ -38,11 +39,11 @@ Depois de instalar e salvar o workbook, o macro `Auto_Open` abre o terminal ao a
 
 `>` cria ou sobrescreve um arquivo; `>>` acrescenta saída ao arquivo. `2>` e `2>>` fazem o mesmo para mensagens de erro (`stderr`), e `2>&1` encaminha erros para o destino atual da saída padrão (`stdout`); a ordem é respeitada, como em `comando > arquivo 2>&1`. `> /dev/null`, `> NUL` e `>&-` descartam `stdout`; `2>&-` descarta `stderr`, sem alterar o código de saída do comando. Caminhos relativos são resolvidos a partir do diretório atual da sessão. Pipes e entrada redirecionada (`<`) ainda não são executados.
 
-No `if`, `comando; then` executa um comando e decide pela cláusula com base no código de saída. A forma `[ ... ]` é um teste (equivalente a `test`), não uma forma de executar comandos; por isso `[ ls mapas ]` tenta interpretar `ls` como operador de teste e é inválido. Para comparar texto, use `=` ou `==`; para comparar números, use operadores como `-eq` e `-gt` (`eq` sem hífen não é um operador de `test`). As condições encadeadas com `&&`/`||` ainda precisam ser comandos ou testes simples. O formato exige `;` antes de `then`, `else` e `fi`. Não há suporte a `elif`, blocos aninhados, loops ou comandos compostos dentro das cláusulas. `&&` e `||` fora de `if` ainda não são listas de comandos.
+No `if`, `comando; then` executa um comando e decide pela cláusula com base no código de saída. A forma `[ ... ]` é um teste (equivalente a `test`), não uma forma de executar comandos; por isso `[ ls mapas ]` tenta interpretar `ls` como operador de teste e é inválido. Para comparar texto, use `=` ou `==`; para comparar números, use operadores como `-eq` e `-gt` (`eq` sem hífen não é um operador de `test`). As condições encadeadas com `&&`/`||` ainda precisam ser comandos ou testes simples. O formato exige `;` antes de `then`, `else` e `fi`. O `for` aceita uma lista explícita de palavras e um único comando simples no corpo; a expansão de variáveis suporta `$NOME` e `${NOME}`, respeita `$NOME` em aspas duplas e mantém literais aspas simples/escapadas. Ainda não há suporte a `elif`, blocos aninhados, loops aninhados, `for` sobre globbing ou listas posicionais, nem comandos compostos dentro de cláusulas. `&&` e `||` fora de `if` ainda não são listas de comandos.
 
 ## Limitações atuais
 
-Este é um shell em estágio inicial: comandos externos, expansão de variáveis, pipes, execução de listas e scripts ainda não são suportados. Cada builtin é implementado em seu próprio módulo e registrado por `clsBuiltinRegistry`; o estado da sessão e a interface de entrada/saída continuam mínimos.
+Este é um shell em estágio inicial: comandos externos, expansão avançada de variáveis, pipes, execução de listas e scripts ainda não são suportados. Cada builtin é implementado em seu próprio módulo e registrado por `clsBuiltinRegistry`; o estado da sessão e a interface de entrada/saída continuam mínimos.
 
 ## Teste manual rápido
 

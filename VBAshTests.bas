@@ -11,6 +11,7 @@ Public Sub VBAsh_RunTests()
     TestFilesystem
     TestClear
     TestConditionals
+    TestForLoops
     TestErrorsAndExitStatus
     TestRedirection
     Debug.Print "VBAsh: " & mAssertions & " assertions passed."
@@ -63,6 +64,45 @@ Private Sub TestTokenizer()
     Set tokens = tokenizer.Tokenize("pwd 2>&-")
     Set token = tokens(2)
     AssertEqual "REDIR_ERR_DISCARD", token.TokenType, "close-stderr redirection token"
+
+    Set tokens = tokenizer.Tokenize("echo '$a' ""$a"" \$a")
+    Set token = tokens(2)
+    AssertEqual "00", Left$(token.ExpansionMask, 2), "single quotes disable variable expansion"
+    Set token = tokens(3)
+    AssertEqual "11", token.ExpansionMask, "double quotes allow variable expansion"
+    Set token = tokens(4)
+    AssertEqual "01", token.ExpansionMask, "escaped dollar disables variable expansion"
+End Sub
+
+Private Sub TestForLoops()
+    Dim session As clsSession
+
+    Set session = New clsSession
+    AssertEqual "1" & vbCrLf & "2" & vbCrLf & "3", _
+        session.ProcessInput("for a in 1 2 3; do echo $a; done"), _
+        "for iterates over values and expands loop variable"
+    AssertEqual "3", session.GetEnv("a"), "for leaves loop variable at final value"
+    AssertEqual "value=3", session.ProcessInput("echo ""value=$a"""), _
+        "double-quoted variable expansion"
+    AssertEqual "value=3", session.ProcessInput("echo value=${a}"), _
+        "braced variable expansion"
+    AssertEqual "$a", session.ProcessInput("echo '$a'"), _
+        "single-quoted variable remains literal"
+    AssertEqual "$a", session.ProcessInput("echo \$a"), _
+        "escaped variable remains literal"
+    AssertEqual "", session.ProcessInput("for item in; do echo not-run; done"), _
+        "for with no values skips its body"
+    AssertEqual 0, session.LastExitCode, "empty for loop status"
+
+    session.ProcessInput "for item in 1 2; do test $item -eq 1; done"
+    AssertEqual 1, session.LastExitCode, "for returns the final body command status"
+
+    session.ProcessInput "for 1invalid in a; do echo invalid; done"
+    AssertEqual 2, session.LastExitCode, "for rejects invalid variable names"
+    session.ProcessInput "for item in a do echo invalid; done"
+    AssertEqual 2, session.LastExitCode, "for requires separator before do"
+    session.ProcessInput "for item in a; do echo invalid done"
+    AssertEqual 2, session.LastExitCode, "for requires separator before done"
 End Sub
 
 Private Sub TestEcho()

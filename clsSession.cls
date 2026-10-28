@@ -82,11 +82,14 @@ Public Function ProcessInput(ByVal commandLine As String) As String
         Exit Function
     End If
 
-    If LCase$(FirstWord(tokens)) = "if" Then
-        ProcessInput = ExecuteIf(tokens, trimmed)
-    Else
-        ProcessInput = ExecuteTokens(tokens, trimmed)
-    End If
+    Select Case LCase$(FirstWord(tokens))
+        Case "if"
+            ProcessInput = ExecuteIf(tokens, trimmed)
+        Case "for"
+            ProcessInput = ExecuteFor(tokens, trimmed)
+        Case Else
+            ProcessInput = ExecuteTokens(tokens, trimmed)
+    End Select
     Exit Function
 
 CommandError:
@@ -112,6 +115,7 @@ Private Function ExecuteTokens(ByVal tokens As Collection, ByVal originalText As
     HasErrorOutput = False
     ErrorOutput = ""
     SuppressNewline = False
+    Set tokens = ExpandTokens(tokens)
     Set parser = New clsParser
     Set command = parser.Parse(tokens, originalText)
 
@@ -150,6 +154,94 @@ BuiltinError:
         LastExitCode = 1
     End If
     Resume Next
+End Function
+
+Private Function ExecuteFor(ByVal tokens As Collection, ByVal originalText As String) As String
+    Dim listSeparator As Long
+    Dim bodyStart As Long
+    Dim bodySeparator As Long
+    Dim bodyEnd As Long
+    Dim markerIndex As Long
+    Dim variableName As String
+    Dim valueToken As clsToken
+    Dim bodyTokens As Collection
+    Dim i As Long
+    Dim output As String
+    Dim errorText As String
+    Dim hasOutput As Boolean
+    Dim hasErrors As Boolean
+    Dim suppressNewline As Boolean
+    Dim commandOutput As String
+    Dim commandError As String
+    Dim commandHasOutput As Boolean
+    Dim commandHasErrors As Boolean
+
+    If tokens.Count < 6 Then
+        Err.Raise vbObjectError + 1070, "clsSession.for", _
+            "Uso: for NOME in valores; do comando; done"
+    End If
+    Set valueToken = tokens(2)
+    If valueToken.TokenType <> "WORD" Then
+        Err.Raise vbObjectError + 1071, "clsSession.for", "Nome de variável inválido no for."
+    End If
+    variableName = valueToken.Value
+    If Not IsValidEnvironmentName(variableName) Then
+        Err.Raise vbObjectError + 1071, "clsSession.for", "Nome de variável inválido no for."
+    End If
+    If Not IsWordAt(tokens, 3, "in") Then
+        Err.Raise vbObjectError + 1072, "clsSession.for", "Esperado 'in' após o nome da variável."
+    End If
+
+    listSeparator = FindToken(tokens, "SEMI", 4)
+    If listSeparator = 0 Or Not IsWordAt(tokens, listSeparator + 1, "do") Then
+        Err.Raise vbObjectError + 1073, "clsSession.for", "Esperado '; do' após os valores do for."
+    End If
+    For i = 4 To listSeparator - 1
+        Set valueToken = tokens(i)
+        If valueToken.TokenType <> "WORD" Then
+            Err.Raise vbObjectError + 1074, "clsSession.for", "Valores inválidos no for."
+        End If
+    Next i
+
+    bodyStart = listSeparator + 2
+    bodySeparator = FindToken(tokens, "SEMI", bodyStart)
+    If bodySeparator = 0 Or bodySeparator = bodyStart Then
+        Err.Raise vbObjectError + 1075, "clsSession.for", "Esperado '; done' após o comando do for."
+    End If
+    bodyEnd = bodySeparator - 1
+    markerIndex = bodySeparator + 1
+    If Not IsWordAt(tokens, markerIndex, "done") Or markerIndex <> tokens.Count - 1 Then
+        Err.Raise vbObjectError + 1076, "clsSession.for", "Esperado 'done' ao final do for."
+    End If
+    Set bodyTokens = TokenRange(tokens, bodyStart, bodyEnd)
+
+    For i = 4 To listSeparator - 1
+        Set valueToken = tokens(i)
+        SetEnv variableName, ExpandVariableText(valueToken.Value, valueToken.ExpansionMask)
+        commandOutput = ExecuteTokens(bodyTokens, originalText)
+        commandHasOutput = HasOutput
+        commandHasErrors = HasErrorOutput
+        commandError = ErrorOutput
+
+        If commandHasOutput Then
+            If hasOutput And Not suppressNewline Then output = output & vbCrLf
+            output = output & commandOutput
+            hasOutput = True
+            suppressNewline = SuppressNewline
+        End If
+        If commandHasErrors Then
+            If hasErrors Then errorText = errorText & vbCrLf
+            errorText = errorText & commandError
+            hasErrors = True
+        End If
+    Next i
+
+    If listSeparator = 4 Then LastExitCode = 0
+    ExecuteFor = output
+    HasOutput = hasOutput
+    SuppressNewline = suppressNewline
+    ErrorOutput = errorText
+    HasErrorOutput = hasErrors
 End Function
 
 Private Function ExecuteIf(ByVal tokens As Collection, ByVal originalText As String) As String
@@ -257,6 +349,76 @@ Private Function ExecuteIf(ByVal tokens As Collection, ByVal originalText As Str
     If Len(conditionErrors) > 0 And Len(branchErrors) > 0 Then ErrorOutput = ErrorOutput & vbCrLf
     ErrorOutput = ErrorOutput & branchErrors
     HasErrorOutput = conditionHasErrors Or branchHasErrors
+End Function
+
+Private Function ExpandTokens(ByVal tokens As Collection) As Collection
+    Dim result As New Collection
+    Dim token As clsToken
+    Dim expandedToken As clsToken
+    Dim i As Long
+
+    For i = 1 To tokens.Count
+        Set token = tokens(i)
+        Set expandedToken = New clsToken
+        If token.TokenType = "WORD" Then
+            expandedToken.Init token.TokenType, _
+                ExpandVariableText(token.Value, token.ExpansionMask), token.ExpansionMask
+        Else
+            expandedToken.Init token.TokenType, token.Value, token.ExpansionMask
+        End If
+        result.Add expandedToken
+    Next i
+    Set ExpandTokens = result
+End Function
+
+Private Function ExpandVariableText(ByVal text As String, ByVal expansionMask As String) As String
+    Dim i As Long
+    Dim variableStart As Long
+    Dim variableEnd As Long
+    Dim variableName As String
+    Dim closingBrace As Long
+    Dim ch As String
+
+    i = 1
+    Do While i <= Len(text)
+        ch = Mid$(text, i, 1)
+        If ch <> "$" Or i > Len(expansionMask) Or Mid$(expansionMask, i, 1) <> "1" Then
+            ExpandVariableText = ExpandVariableText & ch
+            i = i + 1
+        ElseIf Mid$(text, i + 1, 1) = "{" Then
+            closingBrace = InStr(i + 2, text, "}")
+            If closingBrace = 0 Then
+                ExpandVariableText = ExpandVariableText & "$"
+                i = i + 1
+            Else
+                variableName = Mid$(text, i + 2, closingBrace - i - 2)
+                If IsValidEnvironmentName(variableName) Then
+                    ExpandVariableText = ExpandVariableText & GetEnv(variableName)
+                    i = closingBrace + 1
+                Else
+                    ExpandVariableText = ExpandVariableText & Mid$(text, i, closingBrace - i + 1)
+                    i = closingBrace + 1
+                End If
+            End If
+        Else
+            variableStart = i + 1
+            variableEnd = variableStart
+            Do While variableEnd <= Len(text)
+                ch = Mid$(text, variableEnd, 1)
+                If Not ((ch >= "A" And ch <= "Z") Or (ch >= "a" And ch <= "z") Or _
+                        (ch >= "0" And ch <= "9") Or ch = "_") Then Exit Do
+                variableEnd = variableEnd + 1
+            Loop
+            variableName = Mid$(text, variableStart, variableEnd - variableStart)
+            If IsValidEnvironmentName(variableName) Then
+                ExpandVariableText = ExpandVariableText & GetEnv(variableName)
+                i = variableEnd
+            Else
+                ExpandVariableText = ExpandVariableText & "$"
+                i = i + 1
+            End If
+        End If
+    Loop
 End Function
 
 Private Function EvaluateCondition(ByVal tokens As Collection, ByVal firstIndex As Long, _

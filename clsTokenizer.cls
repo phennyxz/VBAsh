@@ -112,8 +112,10 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
         End If
 
         Dim buffer As String
+        Dim bufferMask As String
         Dim hasWord As Boolean
         buffer = ""
+        bufferMask = ""
         hasWord = False
 
         Do While mIndex <= mLen
@@ -146,11 +148,15 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
                         If escapedChar = """" Or escapedChar = "\" Or escapedChar = "$" Or escapedChar = "`" Then
                             mIndex = mIndex + 1
                             ch = Mid$(mSource, mIndex, 1)
+                            bufferMask = bufferMask & IIf(ch = "$", "0", "1")
                         Else
                             buffer = buffer & ch
+                            bufferMask = bufferMask & "1"
                             mIndex = mIndex + 1
                             GoTo ContinueQuoted
                         End If
+                    Else
+                        bufferMask = bufferMask & IIf(quoteCh = "'", "0", "1")
                     End If
 
                     buffer = buffer & ch
@@ -165,19 +171,21 @@ ContinueQuoted:
             If ch = "\" And mIndex < mLen Then
                 mIndex = mIndex + 1
                 buffer = buffer & Mid$(mSource, mIndex, 1)
+                bufferMask = bufferMask & IIf(Mid$(mSource, mIndex, 1) = "$", "0", "1")
                 hasWord = True
                 mIndex = mIndex + 1
                 GoTo ContinueWord
             End If
 
             buffer = buffer & ch
+            bufferMask = bufferMask & "1"
             hasWord = True
             mIndex = mIndex + 1
 ContinueWord:
         Loop
 
         If hasWord Then
-            AddToken Tokenize, "WORD", buffer
+            AddToken Tokenize, "WORD", buffer, bufferMask
         End If
 
 ContinueLoop:
@@ -186,9 +194,10 @@ ContinueLoop:
     AddToken Tokenize, "EOF", ""
 End Function
 
-Private Sub AddToken(ByVal tokenList As Collection, ByVal tokenType As String, ByVal tokenValue As String)
+Private Sub AddToken(ByVal tokenList As Collection, ByVal tokenType As String, _
+                     ByVal tokenValue As String, Optional ByVal expansionMask As String = "")
     Dim token As clsToken
     Set token = New clsToken
-    token.Init tokenType, tokenValue
+    token.Init tokenType, tokenValue, expansionMask
     tokenList.Add token
 End Sub
