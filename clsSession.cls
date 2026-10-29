@@ -63,6 +63,9 @@ Public Function ProcessInput(ByVal commandLine As String) As String
     Dim trimmed As String
     Dim tokenizer As clsTokenizer
     Dim tokens As Collection
+    Dim parser As clsParser
+    Dim executor As clsAstExecutor
+    Dim ast As clsCommand
 
     HasOutput = False
     ErrorOutput = ""
@@ -88,7 +91,10 @@ Public Function ProcessInput(ByVal commandLine As String) As String
         Case "for"
             ProcessInput = ExecuteFor(tokens, trimmed)
         Case Else
-            ProcessInput = ExecuteTokens(tokens, trimmed)
+            Set parser = New clsParser
+            Set ast = parser.ParseAst(tokens, trimmed)
+            Set executor = New clsAstExecutor
+            ProcessInput = executor.Execute(Me, ast)
     End Select
     Exit Function
 
@@ -106,10 +112,6 @@ End Function
 Private Function ExecuteTokens(ByVal tokens As Collection, ByVal originalText As String) As String
     Dim parser As clsParser
     Dim command As clsCommand
-    Dim builtin As IBuiltin
-    Dim separator As Long
-    Dim errorNumber As Long
-    Dim errorDescription As String
 
     HasOutput = False
     HasErrorOutput = False
@@ -118,6 +120,65 @@ Private Function ExecuteTokens(ByVal tokens As Collection, ByVal originalText As
     Set tokens = ExpandTokens(tokens)
     Set parser = New clsParser
     Set command = parser.Parse(tokens, originalText)
+    ExecuteTokens = ExecuteParsedCommand(command)
+End Function
+
+Public Function ExecuteAstSimple(ByVal command As clsCommand) As String
+    Dim expandedCommand As clsCommand
+
+    HasOutput = False
+    HasErrorOutput = False
+    ErrorOutput = ""
+    SuppressNewline = False
+    ClearRequested = False
+    Set expandedCommand = ExpandAstCommand(command)
+    ExecuteAstSimple = ExecuteParsedCommand(expandedCommand)
+End Function
+
+Private Function ExpandAstCommand(ByVal command As clsCommand) As clsCommand
+    Dim expandedCommand As clsCommand
+    Dim token As clsToken
+    Dim expandedToken As clsToken
+    Dim redirection As clsRedirection
+    Dim expandedRedirection As clsRedirection
+    Dim isCommandName As Boolean
+
+    Set expandedCommand = New clsCommand
+    expandedCommand.InitAstNode "SIMPLE_COMMAND", command.SourceStart, command.SourceEnd
+    expandedCommand.OriginalText = command.OriginalText
+    isCommandName = True
+    For Each token In command.Words
+        Set expandedToken = New clsToken
+        expandedToken.Init "WORD", ExpandVariableText(token.Value, token.ExpansionMask), _
+                           token.ExpansionMask, token.BraceExpansionAllowed
+        expandedCommand.AddWordToken expandedToken
+        If isCommandName Then
+            expandedCommand.Name = expandedToken.Value
+            isCommandName = False
+        Else
+            expandedCommand.AddArg expandedToken.Value
+        End If
+    Next token
+
+    For Each redirection In command.Redirections
+        Set expandedRedirection = New clsRedirection
+        expandedRedirection.Operator = redirection.Operator
+        If redirection.TargetToken Is Nothing Then
+            expandedRedirection.Target = redirection.Target
+        Else
+            expandedRedirection.Target = ExpandVariableText( _
+                redirection.TargetToken.Value, redirection.TargetToken.ExpansionMask)
+        End If
+        expandedCommand.AddRedirection expandedRedirection
+    Next redirection
+    Set ExpandAstCommand = expandedCommand
+End Function
+
+Private Function ExecuteParsedCommand(ByVal command As clsCommand) As String
+    Dim builtin As IBuiltin
+    Dim separator As Long
+    Dim errorNumber As Long
+    Dim errorDescription As String
 
     separator = InStr(1, command.Name, "=", vbBinaryCompare)
     If separator > 1 And command.Args.Count = 0 Then
@@ -134,11 +195,11 @@ Private Function ExecuteTokens(ByVal tokens As Collection, ByVal originalText As
     Else
         LastExitCode = 0
         On Error GoTo BuiltinError
-        ExecuteTokens = builtin.Execute(Me, command.Args)
+        ExecuteParsedCommand = builtin.Execute(Me, command.Args)
     End If
 
     If command.Redirections.Count > 0 Then
-        ApplyRedirections command, ExecuteTokens, ErrorOutput
+        ApplyRedirections command, ExecuteParsedCommand, ErrorOutput
     End If
     Exit Function
 

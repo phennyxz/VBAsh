@@ -9,7 +9,7 @@ Private mTestResults As Collection
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
-Private Const EXPECTED_TEST_COUNT As Long = 12
+Private Const EXPECTED_TEST_COUNT As Long = 13
 
 Public Sub VBAsh_RunTests()
     Dim startedAt As Date
@@ -31,6 +31,7 @@ Public Sub VBAsh_RunTests()
     RunTest "Tokenizer"
     RunTest "TokenizerWordSegments"
     RunTest "ParserAst"
+    RunTest "AstExecution"
     RunTest "Echo"
     RunTest "Environment"
     RunTest "Directory"
@@ -76,6 +77,7 @@ Private Sub RunTest(ByVal testName As String)
         Case "Tokenizer": TestTokenizer
         Case "TokenizerWordSegments": TestTokenizerWordSegments
         Case "ParserAst": TestParserAst
+        Case "AstExecution": TestAstExecution
         Case "Echo": TestEcho
         Case "Environment": TestEnvironment
         Case "Directory": TestDirectory
@@ -626,6 +628,78 @@ Private Sub TestEcho()
     AssertTrue session.SuppressNewline, "echo -n suppresses newline"
 
     AssertEqual "hello world", session.ProcessInput("echo ""hello world"""), "quoted echo"
+End Sub
+
+Private Sub TestAstExecution()
+    Dim session As clsSession
+    Dim result As String
+    Dim historyCount As Long
+
+    Set session = New clsSession
+
+    historyCount = session.History.Count
+    result = session.ProcessInput("echo first; echo second")
+    AssertEqual "first" & vbCrLf & "second", result, "sequence combines stdout in order"
+    AssertEqual 0, session.LastExitCode, "sequence returns final command status"
+    AssertTrue session.HasOutput, "sequence reports combined stdout"
+    AssertEqual historyCount + 1, session.History.Count, "sequence is recorded once in history"
+
+    result = session.ProcessInput("clear; echo after-clear")
+    AssertEqual "after-clear", result, "command after clear keeps its stdout"
+    AssertTrue Not session.ClearRequested, "later sequence command clears prior clear request"
+
+    result = session.ProcessInput("VBAsh_AST_SEQUENCE=ready; echo $VBAsh_AST_SEQUENCE")
+    AssertEqual "ready", result, "sequence shares session state between commands"
+    AssertEqual "ready", session.GetEnv("VBAsh_AST_SEQUENCE"), "sequence assignment persists"
+
+    result = session.ProcessInput("echo first; pwd extra")
+    AssertEqual "first", result, "sequence retains stdout before a failing command"
+    AssertEqual 2, session.LastExitCode, "sequence preserves final failing status"
+    AssertTrue session.HasOutput, "sequence retains earlier stdout when final command fails"
+    AssertTrue session.HasErrorOutput, "sequence retains stderr from final command"
+    AssertEqual "VBAsh: Uso: pwd", session.ErrorOutput, "sequence reports builtin error"
+
+    session.ProcessInput "pwd extra && export VBAsh_AST_AND=unexpected"
+    AssertEqual 2, session.LastExitCode, "and-if keeps left failure status when right is skipped"
+    AssertTrue Not session.Env.Exists("VBAsh_AST_AND"), "and-if short-circuit skips assignment"
+    AssertTrue session.HasErrorOutput, "and-if preserves left stderr"
+
+    result = session.ProcessInput("echo visible || export VBAsh_AST_OR=unexpected")
+    AssertEqual "visible", result, "or-if preserves left stdout when right is skipped"
+    AssertEqual 0, session.LastExitCode, "or-if keeps left success status when right is skipped"
+    AssertTrue Not session.Env.Exists("VBAsh_AST_OR"), "or-if short-circuit skips assignment"
+
+    result = session.ProcessInput("echo left && echo right")
+    AssertEqual "left" & vbCrLf & "right", result, "and-if executes right after success"
+    AssertEqual 0, session.LastExitCode, "and-if returns executed right status"
+
+    session.ProcessInput "echo left && pwd extra"
+    AssertEqual 2, session.LastExitCode, "and-if returns failing right status"
+    AssertTrue session.HasErrorOutput, "and-if retains stderr from failing right command"
+
+    session.ProcessInput "pwd extra || export VBAsh_AST_FALLBACK=ran"
+    AssertEqual "ran", session.GetEnv("VBAsh_AST_FALLBACK"), "or-if executes right after failure"
+
+    result = session.ProcessInput("pwd extra || echo recovered")
+    AssertEqual "recovered", result, "or-if executes right after failure"
+    AssertEqual 0, session.LastExitCode, "or-if returns executed right status"
+    AssertTrue session.HasOutput, "or-if reports stdout from recovery command"
+    AssertTrue session.HasErrorOutput, "or-if retains stderr emitted by left command"
+
+    session.ProcessInput "pwd extra && export VBAsh_AST_NESTED_AND=bad || export VBAsh_AST_NESTED_FALLBACK=ran"
+    AssertTrue Not session.Env.Exists("VBAsh_AST_NESTED_AND"), _
+               "a && b || c short-circuits the middle command"
+    AssertEqual "ran", session.GetEnv("VBAsh_AST_NESTED_FALLBACK"), _
+                "a && b || c executes fallback according to AST associativity"
+    AssertEqual 0, session.LastExitCode, "a && b || c returns final executed status"
+
+    result = session.ProcessInput("pwd || export VBAsh_AST_NESTED_OR=bad && export VBAsh_AST_NESTED_AND=ran")
+    AssertTrue Not session.Env.Exists("VBAsh_AST_NESTED_OR"), _
+               "a || b && c skips the middle command after success"
+    AssertEqual "ran", session.GetEnv("VBAsh_AST_NESTED_AND"), _
+                "a || b && c executes final command according to left associativity"
+    AssertEqual 0, session.LastExitCode, "a || b && c returns final executed status"
+    AssertTrue Len(result) > 0, "nested logical expression preserves executed stdout"
 End Sub
 
 Private Sub TestEnvironment()

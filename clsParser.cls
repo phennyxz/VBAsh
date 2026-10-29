@@ -117,6 +117,7 @@ Private Function ParseSimpleCommand() As clsCommand
             Case "WORD"
                 If expectsTarget Then
                     redirection.Target = token.Value
+                    Set redirection.TargetToken = token
                     node.AddRedirection redirection
                     expectsTarget = False
                 Else
