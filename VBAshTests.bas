@@ -651,7 +651,6 @@ Private Sub TestRedirection()
     Dim path As String
     Dim errorPath As String
     Dim mergePath As String
-    Dim textStream As Object
     Dim contents As String
 
     Set session = New clsSession
@@ -663,15 +662,12 @@ Private Sub TestRedirection()
     session.ProcessInput "echo first > """ & path & """"
     AssertEqual 0, session.LastExitCode, "overwrite redirection status"
     AssertTrue Not session.HasOutput, "redirected output not sent to console"
-    Set textStream = fileSystem.OpenTextFile(path, 1)
-    contents = textStream.ReadAll
-    textStream.Close
+    contents = ReadRedirectedFile(fileSystem, path, "first" & vbCrLf, "stdout overwrite")
     AssertEqual "first" & vbCrLf, contents, "overwrite redirection content"
 
     session.ProcessInput "echo second >> """ & path & """"
-    Set textStream = fileSystem.OpenTextFile(path, 1)
-    contents = textStream.ReadAll
-    textStream.Close
+    contents = ReadRedirectedFile(fileSystem, path, _
+        "first" & vbCrLf & "second" & vbCrLf, "stdout append")
     AssertEqual "first" & vbCrLf & "second" & vbCrLf, contents, "append redirection content"
 
     fileSystem.DeleteFile path, True
@@ -681,9 +677,7 @@ Private Sub TestRedirection()
     AssertEqual 0, session.LastExitCode, "successful command status with stderr redirection"
     AssertTrue session.HasOutput, "successful command keeps stdout visible"
     AssertTrue Not session.HasErrorOutput, "successful command emits no stderr"
-    Set textStream = fileSystem.OpenTextFile(errorPath, 1)
-    contents = textStream.ReadAll
-    textStream.Close
+    contents = ReadRedirectedFile(fileSystem, errorPath, "", "empty stderr overwrite")
     AssertEqual "", contents, "successful stderr redirection creates an empty file"
     AssertEqual session.CurrentDirectory, session.ProcessInput("pwd 2>&1"), _
         "stderr-to-stdout leaves successful stdout visible"
@@ -694,40 +688,34 @@ Private Sub TestRedirection()
     AssertEqual 2, session.LastExitCode, "failed command status with stderr redirection"
     AssertTrue Not session.HasOutput, "failed pwd produces no stdout"
     AssertTrue Not session.HasErrorOutput, "stderr redirection suppresses terminal error"
-    Set textStream = fileSystem.OpenTextFile(errorPath, 1)
-    contents = textStream.ReadAll
-    textStream.Close
+    contents = ReadRedirectedFile(fileSystem, errorPath, _
+        "VBAsh: Uso: pwd" & vbCrLf, "stderr overwrite")
     AssertEqual "VBAsh: Uso: pwd" & vbCrLf, contents, "stderr overwrite content"
 
     session.ProcessInput "pwd extra 2>> """ & errorPath & """"
-    Set textStream = fileSystem.OpenTextFile(errorPath, 1)
-    contents = textStream.ReadAll
-    textStream.Close
+    contents = ReadRedirectedFile(fileSystem, errorPath, _
+        "VBAsh: Uso: pwd" & vbCrLf & "VBAsh: Uso: pwd" & vbCrLf, "stderr append")
     AssertEqual "VBAsh: Uso: pwd" & vbCrLf & "VBAsh: Uso: pwd" & vbCrLf, _
         contents, "stderr append content"
 
     session.ProcessInput "pwd extra > """ & mergePath & """ 2>&1"
     AssertEqual 2, session.LastExitCode, "merged stderr preserves failed command status"
     AssertTrue Not session.HasErrorOutput, "2>&1 routes stderr away from terminal"
-    Set textStream = fileSystem.OpenTextFile(mergePath, 1)
-    contents = textStream.ReadAll
-    textStream.Close
+    contents = ReadRedirectedFile(fileSystem, mergePath, _
+        "VBAsh: Uso: pwd" & vbCrLf, "stdout and stderr merge")
     AssertEqual "VBAsh: Uso: pwd" & vbCrLf, contents, "stdout then stderr merge content"
 
     session.ProcessInput "pwd extra 2>&1 > """ & mergePath & """"
     AssertEqual 2, session.LastExitCode, "ordered redirection preserves failed command status"
     AssertTrue session.HasErrorOutput, "stderr-to-stdout uses the stdout destination at that point"
     AssertEqual "VBAsh: Uso: pwd", session.ErrorOutput, "ordered stderr remains on console"
-    Set textStream = fileSystem.OpenTextFile(mergePath, 1)
-    contents = textStream.ReadAll
-    textStream.Close
+    contents = ReadRedirectedFile(fileSystem, mergePath, "", "ordered stderr then stdout redirect")
     AssertEqual "", contents, "later stdout redirection does not move earlier stderr"
 
     session.ProcessInput "missing-command 2> """ & errorPath & """"
     AssertEqual 127, session.LastExitCode, "unknown command status survives stderr redirection"
-    Set textStream = fileSystem.OpenTextFile(errorPath, 1)
-    contents = textStream.ReadAll
-    textStream.Close
+    contents = ReadRedirectedFile(fileSystem, errorPath, _
+        "Command not found: missing-command" & vbCrLf, "unknown-command stderr")
     AssertEqual "Command not found: missing-command" & vbCrLf, _
         contents, "unknown command message is stderr"
     session.ProcessInput "pwd extra 2>&-"
@@ -737,6 +725,50 @@ Private Sub TestRedirection()
     fileSystem.DeleteFile errorPath, True
     fileSystem.DeleteFile mergePath, True
 End Sub
+
+Private Function ReadRedirectedFile(ByVal fileSystem As Object, ByVal path As String, _
+                                    ByVal expectedContents As String, ByVal description As String) As String
+    Dim textStream As Object
+    Dim file As Object
+    Dim resolvedPath As String
+    Dim fileSize As Long
+    Dim fileExists As Boolean
+    Dim errorNumber As Long
+    Dim errorSource As String
+    Dim errorDescription As String
+
+    resolvedPath = fileSystem.GetAbsolutePathName(path)
+    AssertEqual path, resolvedPath, description & ": resolved output path"
+    fileExists = fileSystem.FileExists(resolvedPath)
+    AssertTrue fileExists, _
+        description & ": output file exists at " & resolvedPath
+    Set file = fileSystem.GetFile(resolvedPath)
+    fileSize = CLng(file.Size)
+    AssertEqual Len(expectedContents), fileSize, _
+        description & ": output file size in bytes at " & resolvedPath
+
+    On Error GoTo ReadError
+    Set textStream = fileSystem.OpenTextFile(resolvedPath, 1)
+    AssertEqual (fileSize = 0), CBool(textStream.AtEndOfStream), _
+        description & ": stream EOF state for " & resolvedPath
+    ReadRedirectedFile = textStream.ReadAll
+    textStream.Close
+    Set textStream = Nothing
+    Exit Function
+
+ReadError:
+    errorNumber = Err.Number
+    errorSource = Err.Source
+    errorDescription = Err.Description
+    On Error Resume Next
+    If Not textStream Is Nothing Then textStream.Close
+    Set textStream = Nothing
+    On Error GoTo 0
+    Err.Raise errorNumber, "TestRedirection.ReadRedirectedFile", _
+        errorDescription & " (case: " & description & "; path: " & resolvedPath & _
+        "; exists: " & CStr(fileExists) & _
+        "; size: " & CStr(fileSize) & " bytes; original source: " & errorSource & ")"
+End Function
 
 Private Sub AssertEqual(ByVal expected As Variant, ByVal actual As Variant, ByVal description As String)
     mAssertions = mAssertions + 1
