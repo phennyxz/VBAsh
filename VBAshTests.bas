@@ -198,6 +198,11 @@ Private Sub TestTokenizer()
     Dim token As clsToken
 
     Set tokenizer = New clsTokenizer
+    Set tokens = tokenizer.Tokenize("echo hello")
+    AssertEqual 3, tokens.Count, "plain command token count includes EOF"
+    Set token = tokens(2)
+    AssertEqual "hello", token.Value, "plain command word"
+
     Set tokens = tokenizer.Tokenize("echo ""hello world""")
     AssertEqual 3, tokens.Count, "token count includes EOF"
     Set token = tokens(2)

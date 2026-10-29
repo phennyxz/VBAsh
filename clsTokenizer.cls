@@ -5,7 +5,9 @@ Private mIndex As Long
 Private mLen As Long
 
 Public Function Tokenize(ByVal sourceText As String) As Collection
-    Set Tokenize = New Collection
+    Dim resultTokens As Collection
+
+    Set resultTokens = New Collection
     mSource = sourceText
     mLen = Len(mSource)
     mIndex = 1
@@ -30,35 +32,35 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
         End If
 
         If Mid$(mSource, mIndex, 4) = "2>&1" Then
-            AddToken Tokenize, "REDIR_ERR_TO_OUT", "2>&1"
+            AddToken resultTokens, "REDIR_ERR_TO_OUT", "2>&1"
             mIndex = mIndex + 4
             GoTo ContinueLoop
         End If
 
         If Mid$(mSource, mIndex, 4) = "2>&-" Then
-            AddToken Tokenize, "REDIR_ERR_DISCARD", "2>&-"
+            AddToken resultTokens, "REDIR_ERR_DISCARD", "2>&-"
             mIndex = mIndex + 4
             GoTo ContinueLoop
         End If
 
         If Mid$(mSource, mIndex, 3) = "2>>" Then
-            AddToken Tokenize, "REDIR_ERR_APPEND", "2>>"
+            AddToken resultTokens, "REDIR_ERR_APPEND", "2>>"
             mIndex = mIndex + 3
             GoTo ContinueLoop
         End If
 
         If Mid$(mSource, mIndex, 2) = "2>" Then
-            AddToken Tokenize, "REDIR_ERR", "2>"
+            AddToken resultTokens, "REDIR_ERR", "2>"
             mIndex = mIndex + 2
             GoTo ContinueLoop
         End If
 
         If ch = "|" Then
             If Mid$(mSource, mIndex + 1, 1) = "|" Then
-                AddToken Tokenize, "OR_IF", "||"
+                AddToken resultTokens, "OR_IF", "||"
                 mIndex = mIndex + 2
             Else
-                AddToken Tokenize, "PIPE", "|"
+                AddToken resultTokens, "PIPE", "|"
                 mIndex = mIndex + 1
             End If
             GoTo ContinueLoop
@@ -66,7 +68,7 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
 
         If ch = "&" Then
             If Mid$(mSource, mIndex + 1, 1) = "&" Then
-                AddToken Tokenize, "AND_IF", "&&"
+                AddToken resultTokens, "AND_IF", "&&"
                 mIndex = mIndex + 2
                 GoTo ContinueLoop
             End If
@@ -74,39 +76,39 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
         End If
 
         If ch = ";" Then
-            AddToken Tokenize, "SEMI", ";"
+            AddToken resultTokens, "SEMI", ";"
             mIndex = mIndex + 1
             GoTo ContinueLoop
         End If
 
         If ch = ">" Then
             If Mid$(mSource, mIndex + 1, 2) = "&-" Then
-                AddToken Tokenize, "REDIR_DISCARD", ">&-"
+                AddToken resultTokens, "REDIR_DISCARD", ">&-"
                 mIndex = mIndex + 3
             ElseIf Mid$(mSource, mIndex + 1, 1) = ">" Then
-                AddToken Tokenize, "REDIR_APPEND", ">>"
+                AddToken resultTokens, "REDIR_APPEND", ">>"
                 mIndex = mIndex + 2
             Else
-                AddToken Tokenize, "REDIR_OUT", ">"
+                AddToken resultTokens, "REDIR_OUT", ">"
                 mIndex = mIndex + 1
             End If
             GoTo ContinueLoop
         End If
 
         If ch = "<" Then
-            AddToken Tokenize, "REDIR_IN", "<"
+            AddToken resultTokens, "REDIR_IN", "<"
             mIndex = mIndex + 1
             GoTo ContinueLoop
         End If
 
         If ch = "(" Then
-            AddToken Tokenize, "LPAREN", "("
+            AddToken resultTokens, "LPAREN", "("
             mIndex = mIndex + 1
             GoTo ContinueLoop
         End If
 
         If ch = ")" Then
-            AddToken Tokenize, "RPAREN", ")"
+            AddToken resultTokens, "RPAREN", ")"
             mIndex = mIndex + 1
             GoTo ContinueLoop
         End If
@@ -267,8 +269,8 @@ ContinueWord:
             If hasSegment Then
                 AddWordSegment wordSegments, segmentText, "UNQUOTED", False, segmentStart, segmentEnd
             End If
-            AddToken Tokenize, "WORD", buffer, bufferMask, braceExpansionAllowed
-            Set token = Tokenize(Tokenize.Count)
+            AddToken resultTokens, "WORD", buffer, bufferMask, braceExpansionAllowed
+            Set token = resultTokens.Item(resultTokens.Count)
             Set token.Segments = wordSegments
             token.SourceStart = wordStart
             token.SourceEnd = mIndex - 1
@@ -277,7 +279,8 @@ ContinueWord:
 ContinueLoop:
     Loop
 
-    AddToken Tokenize, "EOF", ""
+    AddToken resultTokens, "EOF", ""
+    Set Tokenize = resultTokens
 End Function
 
 Private Sub AddToken(ByVal tokenList As Collection, ByVal tokenType As String, _
