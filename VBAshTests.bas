@@ -664,10 +664,19 @@ Private Sub TestAstExecution()
     AssertTrue Not session.Env.Exists("VBAsh_AST_AND"), "and-if short-circuit skips assignment"
     AssertTrue session.HasErrorOutput, "and-if preserves left stderr"
 
+    session.ProcessInput "pwd extra && echo VBAsh_AST_AND_UNEXPECTED"
+    AssertEqual 2, session.LastExitCode, "and-if skipped command preserves left status"
+    AssertTrue Not session.HasOutput, "and-if short-circuit suppresses skipped stdout"
+
     result = session.ProcessInput("echo visible || export VBAsh_AST_OR=unexpected")
     AssertEqual "visible", result, "or-if preserves left stdout when right is skipped"
     AssertEqual 0, session.LastExitCode, "or-if keeps left success status when right is skipped"
     AssertTrue Not session.Env.Exists("VBAsh_AST_OR"), "or-if short-circuit skips assignment"
+
+    result = session.ProcessInput("echo visible || pwd extra")
+    AssertEqual "visible", result, "or-if does not execute skipped error command"
+    AssertEqual 0, session.LastExitCode, "or-if skipped error command keeps left status"
+    AssertTrue Not session.HasErrorOutput, "or-if short-circuit suppresses skipped stderr"
 
     result = session.ProcessInput("echo left && echo right")
     AssertEqual "left" & vbCrLf & "right", result, "and-if executes right after success"
