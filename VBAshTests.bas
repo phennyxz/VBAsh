@@ -954,6 +954,8 @@ Private Sub TestRedirection()
     Dim path As String
     Dim errorPath As String
     Dim mergePath As String
+    Dim variablePath As String
+    Dim sequenceVariablePath As String
     Dim contents As String
 
     Set session = New clsSession
@@ -961,12 +963,28 @@ Private Sub TestRedirection()
     path = fileSystem.BuildPath(fileSystem.GetSpecialFolder(2), fileSystem.GetTempName)
     errorPath = fileSystem.BuildPath(fileSystem.GetSpecialFolder(2), fileSystem.GetTempName)
     mergePath = fileSystem.BuildPath(fileSystem.GetSpecialFolder(2), fileSystem.GetTempName)
+    variablePath = fileSystem.BuildPath(fileSystem.GetSpecialFolder(2), fileSystem.GetTempName)
+    sequenceVariablePath = fileSystem.BuildPath(fileSystem.GetSpecialFolder(2), fileSystem.GetTempName)
 
     session.ProcessInput "echo first > """ & path & """"
     AssertEqual 0, session.LastExitCode, "overwrite redirection status"
     AssertTrue Not session.HasOutput, "redirected output not sent to console"
     contents = ReadRedirectedFile(fileSystem, path, "first" & vbCrLf, "stdout overwrite")
     AssertEqual "first" & vbCrLf, contents, "overwrite redirection content"
+
+    session.SetEnv "VBAsh_AST_OUT", variablePath
+    session.ProcessInput "echo variable > ""$VBAsh_AST_OUT"""
+    AssertEqual 0, session.LastExitCode, "expanded redirection target status"
+    contents = ReadRedirectedFile(fileSystem, variablePath, _
+        "variable" & vbCrLf, "quoted variable stdout target")
+    AssertEqual "variable" & vbCrLf, contents, "quoted variable redirection target"
+
+    session.ProcessInput "VBAsh_AST_SEQUENCE_OUT=""" & sequenceVariablePath & _
+        """; echo sequence > ""$VBAsh_AST_SEQUENCE_OUT"""
+    AssertEqual 0, session.LastExitCode, "sequence-expanded redirection target status"
+    contents = ReadRedirectedFile(fileSystem, sequenceVariablePath, _
+        "sequence" & vbCrLf, "sequence variable stdout target")
+    AssertEqual "sequence" & vbCrLf, contents, "sequence expands redirection target at execution"
 
     session.ProcessInput "echo second >> """ & path & """"
     contents = ReadRedirectedFile(fileSystem, path, _
@@ -1025,8 +1043,14 @@ Private Sub TestRedirection()
     AssertEqual 2, session.LastExitCode, "discarding stderr preserves the command status"
     AssertTrue Not session.HasErrorOutput, "2>&- discards stderr"
 
+    session.ProcessInput "echo invalid > """""
+    AssertEqual 2, session.LastExitCode, "empty redirection destination is rejected"
+    AssertTrue session.HasErrorOutput, "empty redirection destination reports an error"
+
     fileSystem.DeleteFile errorPath, True
     fileSystem.DeleteFile mergePath, True
+    fileSystem.DeleteFile variablePath, True
+    fileSystem.DeleteFile sequenceVariablePath, True
 End Sub
 
 Private Function ReadRedirectedFile(ByVal fileSystem As Object, ByVal path As String, _
