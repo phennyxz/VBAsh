@@ -421,7 +421,7 @@ Private Function VBAshFormCommandCode() As String
         "    Else"), vbCrLf)
     VBAshFormCommandCode = VBAshFormCommandCode & vbCrLf & Join(Array( _
         "        mOutput.Value = mOutput.Value & mPrompt.Caption & commandLine & vbCrLf", _
-        "        If gSession.HasOutput Then", _
+        "        If gSession.HasOutput Or Len(result) > 0 Then", _
         "            mOutput.Value = mOutput.Value & result", _
         "            If Not gSession.SuppressNewline Then mOutput.Value = mOutput.Value & vbCrLf", _
         "        End If", _

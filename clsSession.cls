@@ -229,7 +229,7 @@ Private Function ExecuteFor(ByVal tokens As Collection, ByVal originalText As St
         For Each loopValue In loopValues
             SetEnv variableName, CStr(loopValue)
             commandOutput = ExecuteTokens(bodyTokens, originalText)
-            commandHasOutput = HasOutput
+            commandHasOutput = HasOutput Or Len(commandOutput) > 0
             commandHasErrors = HasErrorOutput
             commandError = ErrorOutput
 
