@@ -1,22 +1,242 @@
 Option Explicit
 
 Private mAssertions As Long
+Private mExecutedTests As Long
+Private mPassedTests As Long
+Private mFailedTests As Long
+Private mErrorTests As Long
+Private mTestResults As Collection
+
+Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
+Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
+Private Const EXPECTED_TEST_COUNT As Long = 12
 
 Public Sub VBAsh_RunTests()
+    Dim startedAt As Date
+    Dim finishedAt As Date
+    Dim reportText As String
+    Dim reportPath As String
+    Dim reportError As String
+    Dim summary As String
+    Dim message As String
+
     mAssertions = 0
-    TestTokenizer
-    TestTokenizerWordSegments
-    TestParserAst
-    TestEcho
-    TestEnvironment
-    TestDirectory
-    TestFilesystem
-    TestClear
-    TestConditionals
-    TestForLoops
-    TestErrorsAndExitStatus
-    TestRedirection
-    Debug.Print "VBAsh: " & mAssertions & " assertions passed."
+    mExecutedTests = 0
+    mPassedTests = 0
+    mFailedTests = 0
+    mErrorTests = 0
+    Set mTestResults = New Collection
+    startedAt = Now
+
+    RunTest "Tokenizer"
+    RunTest "TokenizerWordSegments"
+    RunTest "ParserAst"
+    RunTest "Echo"
+    RunTest "Environment"
+    RunTest "Directory"
+    RunTest "Filesystem"
+    RunTest "Clear"
+    RunTest "Conditionals"
+    RunTest "ForLoops"
+    RunTest "ErrorsAndExitStatus"
+    RunTest "Redirection"
+
+    finishedAt = Now
+    summary = TestRunSummary()
+    reportText = BuildTestReport(startedAt, finishedAt, summary)
+    If SaveTestReport(reportText, reportPath, reportError) Then
+        message = summary & vbCrLf & vbCrLf & "Relatório: " & reportPath
+    Else
+        message = summary & vbCrLf & vbCrLf & _
+                  "Não foi possível salvar o relatório TXT." & vbCrLf & reportError & _
+                  vbCrLf & "Alternativa: abra o workbook em uma pasta gravável e execute a suíte novamente."
+    End If
+
+    If mFailedTests + mErrorTests = 0 And mExecutedTests = EXPECTED_TEST_COUNT Then
+        MsgBox message, vbInformation, "VBAsh — resultados dos testes"
+    Else
+        MsgBox message, vbExclamation, "VBAsh — resultados dos testes"
+    End If
+End Sub
+
+Private Sub RunTest(ByVal testName As String)
+    Dim startedAt As Double
+    Dim elapsed As Double
+    Dim assertionStart As Long
+    Dim resultStatus As String
+    Dim errorNumber As Long
+    Dim errorDescription As String
+    Dim errorSource As String
+
+    startedAt = Timer
+    assertionStart = mAssertions
+    On Error GoTo TestError
+
+    Select Case testName
+        Case "Tokenizer": TestTokenizer
+        Case "TokenizerWordSegments": TestTokenizerWordSegments
+        Case "ParserAst": TestParserAst
+        Case "Echo": TestEcho
+        Case "Environment": TestEnvironment
+        Case "Directory": TestDirectory
+        Case "Filesystem": TestFilesystem
+        Case "Clear": TestClear
+        Case "Conditionals": TestConditionals
+        Case "ForLoops": TestForLoops
+        Case "ErrorsAndExitStatus": TestErrorsAndExitStatus
+        Case "Redirection": TestRedirection
+        Case Else
+            Err.Raise vbObjectError + 1102, "VBAshTests.RunTest", _
+                      "Teste não registrado: " & testName
+    End Select
+
+    resultStatus = "PASS"
+    GoTo RecordResult
+
+TestError:
+    errorNumber = Err.Number
+    errorDescription = Err.Description
+    errorSource = Err.Source
+    If errorNumber = ASSERT_EQUAL_ERROR Or errorNumber = ASSERT_TRUE_ERROR Then
+        resultStatus = "FAIL"
+    Else
+        resultStatus = "ERROR"
+    End If
+
+RecordResult:
+    elapsed = Timer - startedAt
+    If elapsed < 0 Then elapsed = elapsed + 86400
+    mExecutedTests = mExecutedTests + 1
+    Select Case resultStatus
+        Case "PASS": mPassedTests = mPassedTests + 1
+        Case "FAIL": mFailedTests = mFailedTests + 1
+        Case "ERROR": mErrorTests = mErrorTests + 1
+    End Select
+
+    If resultStatus = "PASS" Then
+        mTestResults.Add resultStatus & " | " & testName & _
+                         " | assertions: " & CStr(mAssertions - assertionStart) & _
+                         " | duration: " & Format$(elapsed, "0.000") & " s"
+    Else
+        mTestResults.Add resultStatus & " | " & testName & _
+                         " | error " & CStr(errorNumber) & ": " & errorDescription & _
+                         " | source: " & errorSource & _
+                         " | assertions: " & CStr(mAssertions - assertionStart) & _
+                         " | duration: " & Format$(elapsed, "0.000") & " s"
+    End If
+End Sub
+
+Private Function TestRunSummary() As String
+    Dim completion As String
+
+    If mExecutedTests <> EXPECTED_TEST_COUNT Then
+        completion = "INCOMPLETO"
+    ElseIf mFailedTests + mErrorTests > 0 Then
+        completion = "FALHAS"
+    Else
+        completion = "COMPLETO"
+    End If
+
+    TestRunSummary = "Estado: " & completion & vbCrLf & _
+                     "Testes executados: " & CStr(mExecutedTests) & "/" & _
+                     CStr(EXPECTED_TEST_COUNT) & vbCrLf & _
+                     "Aprovados (PASS): " & CStr(mPassedTests) & vbCrLf & _
+                     "Falhas de asserção (FAIL): " & CStr(mFailedTests) & vbCrLf & _
+                     "Erros inesperados (ERROR): " & CStr(mErrorTests) & vbCrLf & _
+                     "Asserções executadas: " & CStr(mAssertions)
+End Function
+
+Private Function BuildTestReport(ByVal startedAt As Date, ByVal finishedAt As Date, _
+                                 ByVal summary As String) As String
+    Dim result As Variant
+    Dim report As String
+
+    report = "VBAsh — relatório de testes" & vbCrLf & _
+             "Início: " & Format$(startedAt, "yyyy-mm-dd hh:nn:ss") & vbCrLf & _
+             "Término: " & Format$(finishedAt, "yyyy-mm-dd hh:nn:ss") & vbCrLf & _
+             summary & vbCrLf & vbCrLf & _
+             "Resultados individuais:" & vbCrLf
+    For Each result In mTestResults
+        report = report & CStr(result) & vbCrLf
+    Next result
+    BuildTestReport = report
+End Function
+
+Private Function SaveTestReport(ByVal reportText As String, ByRef reportPath As String, _
+                                ByRef failureDetails As String) As Boolean
+    Dim fileSystem As Object
+    Dim folders As Collection
+    Dim folder As Variant
+    Dim folderError As String
+
+    On Error GoTo SaveError
+    Set fileSystem = CreateObject("Scripting.FileSystemObject")
+    Set folders = New Collection
+    If Len(Environ$("APPDATA")) > 0 Then folders.Add Environ$("APPDATA")
+    If Len(Environ$("TEMP")) > 0 Then folders.Add Environ$("TEMP")
+    If Len(ThisWorkbook.Path) > 0 Then folders.Add ThisWorkbook.Path
+
+    For Each folder In folders
+        folderError = ""
+        If TryWriteTestReport(fileSystem, CStr(folder), reportText, _
+                              reportPath, folderError) Then
+            SaveTestReport = True
+            Exit Function
+        End If
+        If Len(failureDetails) > 0 Then failureDetails = failureDetails & vbCrLf
+        failureDetails = failureDetails & CStr(folder) & ": " & folderError
+    Next folder
+
+    If folders.Count = 0 Then
+        failureDetails = "APPDATA, TEMP e a pasta do workbook não estão disponíveis."
+    End If
+    Exit Function
+
+SaveError:
+    failureDetails = "Erro " & CStr(Err.Number) & ": " & Err.Description
+End Function
+
+Private Function TryWriteTestReport(ByVal fileSystem As Object, ByVal baseFolder As String, _
+                                    ByVal reportText As String, ByRef reportPath As String, _
+                                    ByRef failureDescription As String) As Boolean
+    Dim reportFolder As String
+    Dim stream As Object
+
+    On Error GoTo WriteError
+    reportFolder = fileSystem.BuildPath(baseFolder, "VBAsh")
+    EnsureReportFolder fileSystem, reportFolder
+    reportFolder = fileSystem.BuildPath(reportFolder, "TestReports")
+    EnsureReportFolder fileSystem, reportFolder
+    reportPath = fileSystem.BuildPath(reportFolder, _
+                 "VBAsh_TestResults_" & Format$(Now, "yyyymmdd_hhnnss") & ".txt")
+    Set stream = fileSystem.CreateTextFile(reportPath, True, True)
+    stream.Write reportText
+    stream.Close
+    Set stream = Nothing
+    TryWriteTestReport = True
+    Exit Function
+
+WriteError:
+    failureDescription = "Erro " & CStr(Err.Number) & ": " & Err.Description
+    On Error Resume Next
+    If Not stream Is Nothing Then stream.Close
+    Set stream = Nothing
+    On Error GoTo 0
+End Function
+
+Private Sub EnsureReportFolder(ByVal fileSystem As Object, ByVal folderPath As String)
+    Dim parentFolder As String
+
+    If fileSystem.FolderExists(folderPath) Then Exit Sub
+    parentFolder = fileSystem.GetParentFolderName(folderPath)
+    If Len(parentFolder) = 0 Or StrComp(parentFolder, folderPath, vbTextCompare) = 0 Then
+        Err.Raise vbObjectError + 1103, "VBAshTests.EnsureReportFolder", _
+                  "Não foi possível determinar a pasta pai de " & folderPath
+    End If
+    If Not fileSystem.FolderExists(parentFolder) Then
+        EnsureReportFolder fileSystem, parentFolder
+    End If
+    fileSystem.CreateFolder folderPath
 End Sub
 
 Private Sub TestParserAst()
@@ -780,12 +1000,12 @@ End Function
 Private Sub AssertEqual(ByVal expected As Variant, ByVal actual As Variant, ByVal description As String)
     mAssertions = mAssertions + 1
     If CStr(expected) <> CStr(actual) Then
-        Err.Raise vbObjectError + 1100, "VBAshTests", _
+        Err.Raise ASSERT_EQUAL_ERROR, "VBAshTests", _
             description & ": expected [" & CStr(expected) & "], got [" & CStr(actual) & "]"
     End If
 End Sub
 
 Private Sub AssertTrue(ByVal condition As Boolean, ByVal description As String)
     mAssertions = mAssertions + 1
-    If Not condition Then Err.Raise vbObjectError + 1101, "VBAshTests", description
+    If Not condition Then Err.Raise ASSERT_TRUE_ERROR, "VBAshTests", description
 End Sub

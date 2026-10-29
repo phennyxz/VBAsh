@@ -25,7 +25,7 @@ Aspas simples e duplas preservam espaços em argumentos; escapes com barra inver
 
 ## Testes
 
-No editor VBA, importe os módulos do projeto e execute a macro `VBAsh_RunTests`. Os testes cobrem tokenização, builtins, operações de diretório, condicionais, estado da sessão, erros, códigos de saída e redirecionamento de saída.
+No editor VBA, importe os módulos do projeto e execute a macro `VBAsh_RunTests`. Ao final, uma caixa de diálogo mostra o total executado, aprovados, falhas de asserção e erros inesperados. Um relatório TXT com resultado, erro e duração de cada teste é salvo em `VBAsh\TestReports` dentro de `%APPDATA%`; se essa pasta não estiver disponível, são tentados `%TEMP%` e a pasta do workbook. O caminho efetivamente usado aparece na caixa de diálogo. Se todos os locais falharem, a caixa informa os erros e sugere verificar permissões. Os testes cobrem tokenização, parser/AST, builtins, operações de diretório, condicionais, estado da sessão, erros, códigos de saída e redirecionamento de saída.
 
 ## Instalação no VBAsh.xlsm
 
