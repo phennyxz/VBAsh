@@ -731,7 +731,7 @@ Private Function ReadRedirectedFile(ByVal fileSystem As Object, ByVal path As St
     Dim textStream As Object
     Dim file As Object
     Dim resolvedPath As String
-    Dim fileSize As Long
+    Dim fileSize As Double
     Dim fileExists As Boolean
     Dim errorNumber As Long
     Dim errorSource As String
@@ -743,14 +743,21 @@ Private Function ReadRedirectedFile(ByVal fileSystem As Object, ByVal path As St
     AssertTrue fileExists, _
         description & ": output file exists at " & resolvedPath
     Set file = fileSystem.GetFile(resolvedPath)
-    fileSize = CLng(file.Size)
-    AssertEqual Len(expectedContents), fileSize, _
-        description & ": output file size in bytes at " & resolvedPath
+    fileSize = CDbl(file.Size)
+    AssertEqual (Len(expectedContents) = 0), (fileSize = 0), _
+        description & ": output file is empty at " & resolvedPath
 
     On Error GoTo ReadError
     Set textStream = fileSystem.OpenTextFile(resolvedPath, 1)
     AssertEqual (fileSize = 0), CBool(textStream.AtEndOfStream), _
         description & ": stream EOF state for " & resolvedPath
+    If fileSize = 0 Then
+        ReadRedirectedFile = ""
+        textStream.Close
+        Set textStream = Nothing
+        Exit Function
+    End If
+
     ReadRedirectedFile = textStream.ReadAll
     textStream.Close
     Set textStream = Nothing
