@@ -115,10 +115,25 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
         Dim bufferMask As String
         Dim hasWord As Boolean
         Dim braceExpansionAllowed As Boolean
+        Dim wordSegments As Collection
+        Dim token As clsToken
+        Dim wordStart As Long
+        Dim segmentText As String
+        Dim segmentStart As Long
+        Dim segmentEnd As Long
+        Dim hasSegment As Boolean
+        Dim quotedText As String
+        Dim quotedStart As Long
+        Dim quoteStart As Long
+        Dim quoteEnd As Long
+        Dim escapedChar As String
         buffer = ""
         bufferMask = ""
         hasWord = False
         braceExpansionAllowed = True
+        Set wordSegments = New Collection
+        wordStart = mIndex
+        hasSegment = False
 
         Do While mIndex <= mLen
             ch = Mid$(mSource, mIndex, 1)
@@ -131,41 +146,87 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
             If ch = "'" Or ch = """" Then
                 Dim quoteCh As String
                 Dim quoteClosed As Boolean
+                If hasSegment Then
+                    AddWordSegment wordSegments, segmentText, "UNQUOTED", False, segmentStart, segmentEnd
+                    hasSegment = False
+                    segmentText = ""
+                End If
                 braceExpansionAllowed = False
                 quoteCh = ch
                 quoteClosed = False
                 hasWord = True
+                quoteStart = mIndex
                 mIndex = mIndex + 1
 
-                Do While mIndex <= mLen
-                    ch = Mid$(mSource, mIndex, 1)
-                    If ch = quoteCh Then
-                        quoteClosed = True
-                        mIndex = mIndex + 1
-                        Exit Do
-                    End If
-
-                    If quoteCh = """" And ch = "\" And mIndex < mLen Then
-                        Dim escapedChar As String
-                        escapedChar = Mid$(mSource, mIndex + 1, 1)
-                        If escapedChar = """" Or escapedChar = "\" Or escapedChar = "$" Or escapedChar = "`" Then
+                If quoteCh = "'" Then
+                    quotedText = ""
+                    Do While mIndex <= mLen
+                        ch = Mid$(mSource, mIndex, 1)
+                        If ch = quoteCh Then
+                            quoteClosed = True
+                            quoteEnd = mIndex
                             mIndex = mIndex + 1
-                            ch = Mid$(mSource, mIndex, 1)
-                            bufferMask = bufferMask & IIf(ch = "$", "0", "1")
-                        Else
-                            buffer = buffer & ch
-                            bufferMask = bufferMask & "1"
-                            mIndex = mIndex + 1
-                            GoTo ContinueQuoted
+                            Exit Do
                         End If
-                    Else
-                        bufferMask = bufferMask & IIf(quoteCh = "'", "0", "1")
+                        quotedText = quotedText & ch
+                        buffer = buffer & ch
+                        bufferMask = bufferMask & "0"
+                        mIndex = mIndex + 1
+                    Loop
+                    If quoteClosed Then
+                        If Len(quotedText) = 0 Then
+                            AddWordSegment wordSegments, "", "SINGLE", False, quoteStart, quoteEnd
+                        Else
+                            AddWordSegment wordSegments, quotedText, "SINGLE", False, _
+                                           quoteStart + 1, quoteEnd - 1
+                        End If
                     End If
+                Else
+                    quotedText = ""
+                    quotedStart = 0
+                    Do While mIndex <= mLen
+                        ch = Mid$(mSource, mIndex, 1)
+                        If ch = quoteCh Then
+                            quoteClosed = True
+                            quoteEnd = mIndex
+                            mIndex = mIndex + 1
+                            Exit Do
+                        End If
 
-                    buffer = buffer & ch
-                    mIndex = mIndex + 1
+                        If ch = "\" And mIndex < mLen Then
+                            escapedChar = Mid$(mSource, mIndex + 1, 1)
+                            If escapedChar = """" Or escapedChar = "\" Or _
+                               escapedChar = "$" Or escapedChar = "`" Then
+                                If Len(quotedText) > 0 Then
+                                    AddWordSegment wordSegments, quotedText, "DOUBLE", False, _
+                                                   quotedStart, mIndex - 1
+                                    quotedText = ""
+                                    quotedStart = 0
+                                End If
+                                buffer = buffer & escapedChar
+                                bufferMask = bufferMask & IIf(escapedChar = "$", "0", "1")
+                                AddWordSegment wordSegments, escapedChar, "DOUBLE", True, mIndex, mIndex + 1
+                                mIndex = mIndex + 2
+                                GoTo ContinueQuoted
+                            End If
+                        End If
+
+                        If quotedStart = 0 Then quotedStart = mIndex
+                        quotedText = quotedText & ch
+                        buffer = buffer & ch
+                        bufferMask = bufferMask & "1"
+                        mIndex = mIndex + 1
 ContinueQuoted:
-                Loop
+                    Loop
+                    If quoteClosed Then
+                        If Len(quotedText) > 0 Then
+                            AddWordSegment wordSegments, quotedText, "DOUBLE", False, _
+                                           quotedStart, quoteEnd - 1
+                        ElseIf quoteEnd = quoteStart + 1 Then
+                            AddWordSegment wordSegments, "", "DOUBLE", False, quoteStart, quoteEnd
+                        End If
+                    End If
+                End If
 
                 If Not quoteClosed Then Err.Raise vbObjectError + 1000, "clsTokenizer.Tokenize", "Aspas não fechadas."
                 GoTo ContinueWord
@@ -173,14 +234,28 @@ ContinueQuoted:
 
             If ch = "\" And mIndex < mLen Then
                 braceExpansionAllowed = False
+                If hasSegment Then
+                    AddWordSegment wordSegments, segmentText, "UNQUOTED", False, segmentStart, segmentEnd
+                    hasSegment = False
+                    segmentText = ""
+                End If
                 mIndex = mIndex + 1
-                buffer = buffer & Mid$(mSource, mIndex, 1)
-                bufferMask = bufferMask & IIf(Mid$(mSource, mIndex, 1) = "$", "0", "1")
+                escapedChar = Mid$(mSource, mIndex, 1)
+                buffer = buffer & escapedChar
+                bufferMask = bufferMask & IIf(escapedChar = "$", "0", "1")
+                AddWordSegment wordSegments, escapedChar, "UNQUOTED", True, mIndex - 1, mIndex
                 hasWord = True
                 mIndex = mIndex + 1
                 GoTo ContinueWord
             End If
 
+            If Not hasSegment Then
+                segmentStart = mIndex
+                segmentText = ""
+                hasSegment = True
+            End If
+            segmentEnd = mIndex
+            segmentText = segmentText & ch
             buffer = buffer & ch
             bufferMask = bufferMask & "1"
             hasWord = True
@@ -189,7 +264,14 @@ ContinueWord:
         Loop
 
         If hasWord Then
+            If hasSegment Then
+                AddWordSegment wordSegments, segmentText, "UNQUOTED", False, segmentStart, segmentEnd
+            End If
             AddToken Tokenize, "WORD", buffer, bufferMask, braceExpansionAllowed
+            Set token = Tokenize(Tokenize.Count)
+            Set token.Segments = wordSegments
+            token.SourceStart = wordStart
+            token.SourceEnd = mIndex - 1
         End If
 
 ContinueLoop:
@@ -204,5 +286,22 @@ Private Sub AddToken(ByVal tokenList As Collection, ByVal tokenType As String, _
     Dim token As clsToken
     Set token = New clsToken
     token.Init tokenType, tokenValue, expansionMask, braceExpansionAllowed
+    If tokenType = "EOF" Then
+        token.SourceStart = mLen + 1
+        token.SourceEnd = mLen + 1
+    Else
+        token.SourceStart = mIndex
+        token.SourceEnd = mIndex + Len(tokenValue) - 1
+    End If
     tokenList.Add token
+End Sub
+
+Private Sub AddWordSegment(ByVal segments As Collection, ByVal segmentText As String, _
+                           ByVal quoteContext As String, ByVal isEscaped As Boolean, _
+                           ByVal sourceStart As Long, ByVal sourceEnd As Long)
+    Dim segment As clsWordSegment
+
+    Set segment = New clsWordSegment
+    segment.Init segmentText, quoteContext, isEscaped, sourceStart, sourceEnd
+    segments.Add segment
 End Sub

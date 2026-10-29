@@ -5,6 +5,7 @@ Private mAssertions As Long
 Public Sub VBAsh_RunTests()
     mAssertions = 0
     TestTokenizer
+    TestTokenizerWordSegments
     TestEcho
     TestEnvironment
     TestDirectory
@@ -78,6 +79,96 @@ Private Sub TestTokenizer()
     Set tokens = tokenizer.Tokenize("echo ""{1..3}""")
     Set token = tokens(2)
     AssertTrue Not token.BraceExpansionAllowed, "quoted words disable brace expansion"
+End Sub
+
+Private Sub TestTokenizerWordSegments()
+    Dim tokenizer As clsTokenizer
+    Dim tokens As Collection
+    Dim token As clsToken
+    Dim segment As clsWordSegment
+    Dim commandLine As String
+
+    Set tokenizer = New clsTokenizer
+
+    Set tokens = tokenizer.Tokenize("echo '$NOME'")
+    Set token = tokens(2)
+    AssertEqual 1, token.Segments.Count, "single-quoted word has one lexical segment"
+    AssertEqual "00000", token.ExpansionMask, "single-quoted variable text is non-expandable"
+    Set segment = token.Segments(1)
+    AssertEqual "SINGLE", segment.QuoteContext, "single-quoted context is preserved"
+    AssertEqual "$NOME", segment.Text, "single-quoted text is preserved"
+    AssertTrue Not segment.IsEscaped, "single-quoted text is not marked escaped"
+
+    Set tokens = tokenizer.Tokenize("echo ""$NOME""")
+    Set token = tokens(2)
+    AssertEqual "11111", token.ExpansionMask, "double-quoted variable text remains expandable"
+    Set segment = token.Segments(1)
+    AssertEqual "DOUBLE", segment.QuoteContext, "double-quoted context is preserved"
+    AssertEqual "$NOME", segment.Text, "double-quoted text is preserved"
+    AssertTrue Not segment.IsEscaped, "unescaped double-quoted text is not marked escaped"
+
+    Set tokens = tokenizer.Tokenize("echo ""texto com espaços""")
+    Set token = tokens(2)
+    Set segment = token.Segments(1)
+    AssertEqual "texto com espaços", segment.Text, "double-quoted spaces remain in one segment"
+    AssertEqual "DOUBLE", segment.QuoteContext, "spaced text retains double-quote context"
+
+    Set tokens = tokenizer.Tokenize("echo ""\$NOME""")
+    Set token = tokens(2)
+    AssertEqual "01111", token.ExpansionMask, "escaped dollar remains non-expandable"
+    AssertEqual 2, token.Segments.Count, "escaped character splits its quoted segment"
+    Set segment = token.Segments(1)
+    AssertEqual "DOUBLE", segment.QuoteContext, "escaped dollar retains double-quote context"
+    AssertTrue segment.IsEscaped, "escaped dollar is marked escaped"
+
+    commandLine = "echo ab""cd ef""gh"
+    Set tokens = tokenizer.Tokenize(commandLine)
+    Set token = tokens(2)
+    AssertEqual "abcd efgh", token.Value, "adjacent quoted fragments remain one word"
+    AssertEqual 3, token.Segments.Count, "adjacent fragments retain their boundaries"
+    Set segment = token.Segments(1)
+    AssertEqual "ab", segment.Text, "first unquoted fragment is retained"
+    AssertEqual "UNQUOTED", segment.QuoteContext, "first fragment context"
+    Set segment = token.Segments(2)
+    AssertEqual "cd ef", segment.Text, "quoted fragment containing spaces is retained"
+    AssertEqual "DOUBLE", segment.QuoteContext, "middle fragment context"
+    Set segment = token.Segments(3)
+    AssertEqual "gh", segment.Text, "last unquoted fragment is retained"
+    AssertEqual "UNQUOTED", segment.QuoteContext, "last fragment context"
+    AssertEqual "ab""cd ef""gh", _
+        Mid$(commandLine, token.SourceStart, token.SourceEnd - token.SourceStart + 1), _
+        "word source span includes its quote syntax"
+
+    Set tokens = tokenizer.Tokenize("echo a\ b")
+    Set token = tokens(2)
+    AssertEqual "a b", token.Value, "escaped space remains within a word"
+    AssertEqual 3, token.Segments.Count, "escaped space creates a segment boundary"
+    Set segment = token.Segments(2)
+    AssertEqual " ", segment.Text, "escaped segment retains the whitespace"
+    AssertEqual "UNQUOTED", segment.QuoteContext, "escaped space quote context"
+    AssertTrue segment.IsEscaped, "escaped space is marked escaped"
+    AssertEqual 7, segment.SourceStart, "escaped segment starts at its backslash"
+    AssertEqual 8, segment.SourceEnd, "escaped segment ends at its character"
+
+    Set tokens = tokenizer.Tokenize("echo """"")
+    Set token = tokens(2)
+    AssertEqual "", token.Value, "empty quoted word retains its value"
+    AssertEqual 1, token.Segments.Count, "empty quoted word retains a segment"
+    Set segment = token.Segments(1)
+    AssertEqual "", segment.Text, "empty quoted segment has empty text"
+    AssertEqual "DOUBLE", segment.QuoteContext, "empty quoted segment context"
+
+    Set tokens = tokenizer.Tokenize("echo ""a&&b|c;d>e"" x\|y; echo z")
+    AssertEqual 7, tokens.Count, "quotes and escapes preserve operator boundaries"
+    Set token = tokens(2)
+    AssertEqual "a&&b|c;d>e", token.Value, "operators inside quotes remain word text"
+    Set token = tokens(3)
+    AssertEqual "x|y", token.Value, "escaped operator remains within a word"
+    AssertEqual 3, token.Segments.Count, "escaped operator has its own segment"
+    Set segment = token.Segments(2)
+    AssertTrue segment.IsEscaped, "escaped operator metadata is preserved"
+    Set token = tokens(4)
+    AssertEqual "SEMI", token.TokenType, "unquoted command separator remains an operator"
 End Sub
 
 Private Sub TestForLoops()
