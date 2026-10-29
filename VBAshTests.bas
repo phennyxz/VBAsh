@@ -6,6 +6,7 @@ Public Sub VBAsh_RunTests()
     mAssertions = 0
     TestTokenizer
     TestTokenizerWordSegments
+    TestParserAst
     TestEcho
     TestEnvironment
     TestDirectory
@@ -17,6 +18,179 @@ Public Sub VBAsh_RunTests()
     TestRedirection
     Debug.Print "VBAsh: " & mAssertions & " assertions passed."
 End Sub
+
+Private Sub TestParserAst()
+    Dim tokenizer As clsTokenizer
+    Dim parser As clsParser
+    Dim tokens As Collection
+    Dim node As clsCommand
+    Dim child As clsCommand
+    Dim token As clsToken
+    Dim sourceToken As clsToken
+    Dim wordSegment As clsWordSegment
+    Dim commandLine As String
+    Dim legacyCommand As clsCommand
+
+    Set tokenizer = New clsTokenizer
+    Set parser = New clsParser
+
+    commandLine = "echo ab""cd ef""gh"
+    Set tokens = tokenizer.Tokenize(commandLine)
+    Set node = parser.ParseAst(tokens, commandLine)
+    AssertEqual "SIMPLE_COMMAND", node.NodeType, "simple command AST node"
+    AssertEqual 3, node.Words.Count, "simple command preserves all word tokens"
+    AssertEqual "echo", node.Name, "legacy command name remains available"
+    AssertEqual 2, node.Args.Count, "legacy arguments remain available"
+    Set token = node.Words(2)
+    Set sourceToken = tokens(2)
+    AssertTrue token Is sourceToken, "AST retains original word-token object"
+    AssertEqual "abcd efgh", token.Value, "AST token keeps flattened compatibility value"
+    AssertEqual 3, token.Segments.Count, "AST token retains lexical segments"
+    AssertTrue Not token.BraceExpansionAllowed, "AST retains brace-expansion metadata"
+    AssertEqual sourceToken.SourceStart, token.SourceStart, "AST retains original word start"
+    AssertEqual sourceToken.SourceEnd, token.SourceEnd, "AST retains original word end"
+    Set wordSegment = token.Segments(2)
+    AssertEqual "DOUBLE", wordSegment.QuoteContext, "AST retains quoted segment context"
+    AssertEqual token.SourceStart, node.SourceStart + 5, "simple node starts at first token"
+    AssertEqual token.SourceEnd, node.SourceEnd, "simple node ends at final word"
+    AssertEqual commandLine, _
+        Mid$(commandLine, node.SourceStart, node.SourceEnd - node.SourceStart + 1), _
+        "simple node span covers the complete command"
+
+    Set node = parser.ParseAst(tokenizer.Tokenize("echo '$NOME'"), "echo '$NOME'")
+    Set token = node.Words(2)
+    AssertEqual "00000", token.ExpansionMask, "AST retains expansion mask"
+    Set wordSegment = token.Segments(1)
+    AssertEqual "SINGLE", wordSegment.QuoteContext, "AST retains single-quote metadata"
+    AssertEqual "$NOME", wordSegment.Text, "AST retains source word segment text"
+
+    Set legacyCommand = parser.Parse(tokenizer.Tokenize("echo hi"), "echo hi")
+    AssertEqual "SIMPLE_COMMAND", legacyCommand.NodeType, "legacy Parse returns simple AST node"
+    AssertEqual "echo", legacyCommand.Name, "legacy Parse preserves command name"
+    AssertEqual "hi", legacyCommand.Args(1), "legacy Parse preserves arguments"
+
+    Set node = parser.ParseAst(tokenizer.Tokenize("echo a; pwd; echo b"), "echo a; pwd; echo b")
+    AssertEqual "SEQUENCE", node.NodeType, "semicolon creates sequence node"
+    AssertEqual 3, node.Children.Count, "sequence preserves all commands"
+    Set child = node.Children(1)
+    AssertEqual "echo", child.Name, "sequence preserves first command order"
+    Set child = node.Children(2)
+    AssertEqual "pwd", child.Name, "sequence preserves second command order"
+    Set child = node.Children(3)
+    AssertEqual "echo", child.Name, "sequence preserves third command order"
+    AssertEqual "b", child.Args(1), "sequence retains final command arguments"
+    AssertEqual "echo a; pwd; echo b", _
+        Mid$("echo a; pwd; echo b", node.SourceStart, node.SourceEnd - node.SourceStart + 1), _
+        "sequence span covers all child commands"
+
+    Set node = parser.ParseAst(tokenizer.Tokenize("a && b"), "a && b")
+    AssertEqual "AND_IF", node.NodeType, "and-if node type"
+    AssertEqual 2, node.Children.Count, "and-if has two operands"
+    AssertEqual "a", node.Children(1).Name, "and-if left operand"
+    AssertEqual "b", node.Children(2).Name, "and-if right operand"
+
+    Set node = parser.ParseAst(tokenizer.Tokenize("a || b"), "a || b")
+    AssertEqual "OR_IF", node.NodeType, "or-if node type"
+    AssertEqual "a", node.Children(1).Name, "or-if left operand"
+    AssertEqual "b", node.Children(2).Name, "or-if right operand"
+
+    Set node = parser.ParseAst(tokenizer.Tokenize("a && b || c"), "a && b || c")
+    AssertEqual "OR_IF", node.NodeType, "and-or operators share precedence"
+    Set child = node.Children(1)
+    AssertEqual "AND_IF", child.NodeType, "and-or operators associate left"
+    AssertEqual "c", node.Children(2).Name, "or-if has final right operand"
+
+    Set node = parser.ParseAst(tokenizer.Tokenize("a || b && c"), "a || b && c")
+    AssertEqual "AND_IF", node.NodeType, "or-and operators share precedence"
+    Set child = node.Children(1)
+    AssertEqual "OR_IF", child.NodeType, "or-and operators associate left"
+    AssertEqual "c", node.Children(2).Name, "and-if has final right operand"
+
+    Set node = parser.ParseAst(tokenizer.Tokenize("a && b && c"), "a && b && c")
+    AssertEqual "AND_IF", node.NodeType, "repeated and-if root"
+    AssertEqual "AND_IF", node.Children(1).NodeType, "and-if is left associative"
+    Set node = parser.ParseAst(tokenizer.Tokenize("a || b || c"), "a || b || c")
+    AssertEqual "OR_IF", node.NodeType, "repeated or-if root"
+    AssertEqual "OR_IF", node.Children(1).NodeType, "or-if is left associative"
+
+    Set node = parser.ParseAst(tokenizer.Tokenize("a && b; c || d"), "a && b; c || d")
+    AssertEqual "SEQUENCE", node.NodeType, "semicolon has lower precedence"
+    AssertEqual "AND_IF", node.Children(1).NodeType, "first sequence item keeps logical tree"
+    AssertEqual "OR_IF", node.Children(2).NodeType, "second sequence item keeps logical tree"
+
+    Set node = parser.ParseAst(tokenizer.Tokenize("echo hi > out"), "echo hi > out")
+    AssertEqual "SIMPLE_COMMAND", node.NodeType, "redirection remains part of simple command"
+    AssertEqual 1, node.Redirections.Count, "existing redirection parsing is preserved"
+    AssertEqual "REDIR_OUT", node.Redirections(1).Operator, "redirection operator preserved"
+    AssertEqual "out", node.Redirections(1).Target, "redirection target preserved"
+
+    AssertAstSyntaxError tokenizer, parser, "", "empty input is rejected"
+    AssertAstSyntaxError tokenizer, parser, "; a", "leading sequence separator is rejected"
+    AssertAstSyntaxError tokenizer, parser, "a ;; b", "consecutive sequence separators are rejected"
+    AssertAstSyntaxError tokenizer, parser, "a &&", "incomplete and-if is rejected"
+    AssertAstSyntaxError tokenizer, parser, "a ||", "incomplete or-if is rejected"
+    AssertAstSyntaxError tokenizer, parser, "a && || b", "consecutive logical operators are rejected"
+    AssertAstSyntaxError tokenizer, parser, "a | b", "out-of-scope pipeline operator is rejected"
+    AssertLegacyParseError tokenizer, parser, "echo a;", "legacy Parse continues rejecting separators"
+    AssertLegacyParseError tokenizer, parser, "a && b", "legacy Parse continues rejecting logical lists"
+
+End Sub
+
+Private Sub AssertAstSyntaxError(ByVal tokenizer As clsTokenizer, ByVal parser As clsParser, _
+                                 ByVal commandLine As String, ByVal description As String)
+    Dim tokens As Collection
+    Dim node As clsCommand
+    Dim errorNumber As Long
+    Dim errorSource As String
+
+    Set tokens = tokenizer.Tokenize(commandLine)
+    On Error GoTo ParseError
+    Set node = parser.ParseAst(tokens, commandLine)
+    On Error GoTo 0
+    AssertTrue False, description
+    Exit Sub
+
+ParseError:
+    errorNumber = Err.Number
+    errorSource = Err.Source
+    Err.Clear
+    On Error GoTo 0
+    AssertTrue StrComp(errorSource, "clsParser.ParseAst", vbBinaryCompare) = 0 And _
+               IsParserSyntaxErrorNumber(errorNumber), _
+        description & " (unexpected error from " & errorSource & ": " & CStr(errorNumber) & ")"
+End Sub
+
+Private Sub AssertLegacyParseError(ByVal tokenizer As clsTokenizer, ByVal parser As clsParser, _
+                                   ByVal commandLine As String, ByVal description As String)
+    Dim tokens As Collection
+    Dim command As clsCommand
+    Dim errorNumber As Long
+    Dim errorSource As String
+
+    Set tokens = tokenizer.Tokenize(commandLine)
+    On Error GoTo ParseError
+    Set command = parser.Parse(tokens, commandLine)
+    On Error GoTo 0
+    AssertTrue False, description
+    Exit Sub
+
+ParseError:
+    errorNumber = Err.Number
+    errorSource = Err.Source
+    Err.Clear
+    On Error GoTo 0
+    AssertTrue StrComp(errorSource, "clsParser.Parse", vbBinaryCompare) = 0 And _
+               errorNumber = vbObjectError + 1001, _
+        description & " (unexpected error from " & errorSource & ": " & CStr(errorNumber) & ")"
+End Sub
+
+Private Function IsParserSyntaxErrorNumber(ByVal errorNumber As Long) As Boolean
+    Select Case errorNumber
+        Case vbObjectError + 1001, vbObjectError + 1002, vbObjectError + 1003, _
+             vbObjectError + 1005, vbObjectError + 1083
+            IsParserSyntaxErrorNumber = True
+    End Select
+End Function
 
 Private Sub TestTokenizer()
     Dim tokenizer As clsTokenizer
