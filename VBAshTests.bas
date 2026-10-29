@@ -172,7 +172,7 @@ Private Sub TestDirectory()
 
     session.ProcessInput "cd .."
     AssertEqual parentDirectory, session.CurrentDirectory, "cd updates session directory"
-    AssertEqual originalDirectory & "> ", session.Prompt, "cd updates prompt"
+    AssertEqual parentDirectory & "> ", session.Prompt, "cd updates prompt"
 
     AssertEqual originalDirectory, session.ProcessInput("cd -"), "cd - prints previous directory"
     AssertEqual originalDirectory, session.CurrentDirectory, "cd - restores directory"
