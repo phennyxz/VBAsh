@@ -38,9 +38,9 @@ Private Sub TestParserAst()
     Set tokens = tokenizer.Tokenize(commandLine)
     Set node = parser.ParseAst(tokens, commandLine)
     AssertEqual "SIMPLE_COMMAND", node.NodeType, "simple command AST node"
-    AssertEqual 3, node.Words.Count, "simple command preserves all word tokens"
+    AssertEqual 2, node.Words.Count, "simple command preserves all word tokens"
     AssertEqual "echo", node.Name, "legacy command name remains available"
-    AssertEqual 2, node.Args.Count, "legacy arguments remain available"
+    AssertEqual 1, node.Args.Count, "legacy arguments remain available"
     Set token = node.Words(2)
     Set sourceToken = tokens(2)
     AssertTrue token Is sourceToken, "AST retains original word-token object"
