@@ -4,37 +4,38 @@ Public gSession As clsSession
 Public gConsole As clsConsole
 Public gFDTable As clsFileDescriptorTable
 
+Public Const VBAsh_STREAM_ERROR_NOT_SUPPORTED As Long = vbObjectError + 1200
+Public Const VBAsh_STREAM_ERROR_CLOSED As Long = vbObjectError + 1201
+Public Const VBAsh_STREAM_ERROR_READ_FAILURE As Long = vbObjectError + 1202
+Public Const VBAsh_STREAM_ERROR_WRITE_FAILURE As Long = vbObjectError + 1203
+Public Const VBAsh_STREAM_ERROR_OPEN_FAILURE As Long = vbObjectError + 1204
+
+Public Sub Auto_Open()
+    VBAsh_Start
+End Sub
+
 Public Sub VBAsh_Start()
+    Dim terminal As Object
+    Dim failure As String
+
     Set gSession = New clsSession
     Set gConsole = New clsConsole
     Set gFDTable = New clsFileDescriptorTable
 
     gConsole.Initialize
 
-    Do
-        Dim line As String
-        line = InputBox(gSession.Prompt, "VBAsh")
+    On Error GoTo RestoreWorkbook
+    ThisWorkbook.Windows(1).Visible = False
+    Set terminal = VBA.UserForms.Add("frmVBAsh")
+    terminal.Show
+    GoTo Finish
 
-        If StrPtr(line) = 0 Then
-            ' Usuário clicou em Cancelar
-            Exit Do
-        End If
+RestoreWorkbook:
+    failure = Err.Description
 
-        If Len(Trim$(line)) = 0 Then
-            GoTo ContinueLoop
-        End If
-
-        Dim result As String
-        result = gSession.ProcessInput(line)
-
-        If Len(result) > 0 Then
-            gConsole.WriteLine result
-        End If
-
-        If LCase$(Trim$(line)) = "exit" Then
-            Exit Do
-        End If
-
-ContinueLoop:
-    Loop
+Finish:
+    On Error Resume Next
+    ThisWorkbook.Windows(1).Visible = True
+    On Error GoTo 0
+    If Len(failure) > 0 Then MsgBox "Não foi possível abrir o terminal VBAsh:" & vbCrLf & failure, vbCritical, "VBAsh"
 End Sub
