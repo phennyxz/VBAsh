@@ -29,7 +29,7 @@ Private Property Get IStream_CanWrite() As Boolean
 End Property
 
 Private Property Get IStream_AtEndOfStream() As Boolean
-    IStream_AtEndOfStream = mIsClosed Or Not mCanRead Or mPosition > Len(mBuffer)
+    IStream_AtEndOfStream = mCanRead And Not mIsClosed And mPosition > Len(mBuffer)
 End Property
 
 Private Property Get IStream_IsClosed() As Boolean
@@ -51,8 +51,12 @@ End Property
 Private Function IStream_ReadText(ByVal maxChars As Long) As String
     Dim remainingChars As Long
 
-    If mIsClosed Then RaiseStreamError "Stream is closed."
-    If Not mCanRead Then RaiseStreamError "Stream does not support reading."
+    If mIsClosed Then
+        RaiseStreamError VBAsh_STREAM_ERROR_CLOSED, "Stream is closed."
+    End If
+    If Not mCanRead Then
+        RaiseStreamError VBAsh_STREAM_ERROR_NOT_SUPPORTED, "Stream does not support reading."
+    End If
     ClearStreamError
     If maxChars <= 0 Then Exit Function
 
@@ -64,8 +68,12 @@ Private Function IStream_ReadText(ByVal maxChars As Long) As String
 End Function
 
 Private Function IStream_WriteText(ByVal text As String) As Long
-    If mIsClosed Then RaiseStreamError "Stream is closed."
-    If Not mCanWrite Then RaiseStreamError "Stream does not support writing."
+    If mIsClosed Then
+        RaiseStreamError VBAsh_STREAM_ERROR_CLOSED, "Stream is closed."
+    End If
+    If Not mCanWrite Then
+        RaiseStreamError VBAsh_STREAM_ERROR_NOT_SUPPORTED, "Stream does not support writing."
+    End If
     ClearStreamError
     mBuffer = mBuffer & text
     IStream_WriteText = Len(text)
@@ -76,10 +84,10 @@ Private Sub IStream_CloseStream()
     ClearStreamError
 End Sub
 
-Private Sub RaiseStreamError(ByVal description As String)
-    mLastErrorNumber = VBAsh_STREAM_ERROR_NOT_SUPPORTED
+Private Sub RaiseStreamError(ByVal errorNumber As Long, ByVal description As String)
+    mLastErrorNumber = errorNumber
     mLastErrorDescription = description
-    Err.Raise VBAsh_STREAM_ERROR_NOT_SUPPORTED, "clsStreamContractProbe", description
+    Err.Raise errorNumber, "clsStreamContractProbe", description
 End Sub
 
 Private Sub ClearStreamError()

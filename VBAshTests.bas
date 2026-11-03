@@ -1122,6 +1122,13 @@ Private Sub TestStreamContract()
     Dim stream As IStream
     Dim errorNumber As Long
 
+    AssertTrue VBAsh_STREAM_ERROR_NOT_SUPPORTED <> VBAsh_STREAM_ERROR_CLOSED, _
+               "unsupported and closed stream errors are distinct"
+    AssertTrue VBAsh_STREAM_ERROR_READ_FAILURE <> VBAsh_STREAM_ERROR_WRITE_FAILURE, _
+               "read and write failures are distinct"
+    AssertTrue VBAsh_STREAM_ERROR_OPEN_FAILURE <> VBAsh_STREAM_ERROR_READ_FAILURE, _
+               "open and read failures are distinct"
+
     Set probe = New clsStreamContractProbe
     Set stream = probe
     AssertTrue Not stream.IsClosed, "new stream starts open"
@@ -1137,6 +1144,8 @@ Private Sub TestStreamContract()
     AssertEqual "", stream.ReadText(0), "zero-length read returns empty text"
 
     probe.ConfigureCapabilities False, True
+    AssertTrue Not stream.AtEndOfStream, _
+               "non-readable stream is not reported as exhausted"
     On Error Resume Next
     stream.ReadText 1
     errorNumber = Err.Number
@@ -1165,16 +1174,25 @@ Private Sub TestStreamContract()
 
     stream.CloseStream
     AssertTrue stream.IsClosed, "stream contract reports closed state"
-    AssertTrue stream.AtEndOfStream, "closed stream reports EOF"
+    AssertTrue Not stream.AtEndOfStream, "closed state is distinct from EOF"
     AssertTrue Not stream.HasError, "successful close clears error state"
+    On Error Resume Next
+    stream.CloseStream
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual 0, errorNumber, "closing an already closed stream is idempotent"
+    AssertTrue stream.IsClosed, "repeated close keeps the stream closed"
     On Error Resume Next
     stream.ReadText 1
     errorNumber = Err.Number
     Err.Clear
     On Error GoTo 0
-    AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, _
-                "operation on a closed stream raises the contract error"
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, errorNumber, _
+                "operation on a closed stream raises the closed-stream error"
     AssertTrue stream.HasError, "operation on a closed stream records error state"
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, _
+                "closed-stream error has its distinct code"
 End Sub
 
 Private Function ReadRedirectedFile(ByVal fileSystem As Object, ByVal path As String, _

@@ -2,11 +2,15 @@ Option Explicit
 
 ' LastErrorNumber and LastErrorDescription describe the most recent failed operation.
 ' A successful read, write, or close clears that error state.
-' Unsupported operations and operations on a closed stream raise
-' VBAsh_STREAM_ERROR_NOT_SUPPORTED and update the error state.
-' AtEndOfStream is true when no more data can be read or the stream is closed.
+' Unsupported operations raise VBAsh_STREAM_ERROR_NOT_SUPPORTED; operations on
+' a closed stream raise VBAsh_STREAM_ERROR_CLOSED. Read, write, and open failures
+' have separate reserved codes: VBAsh_STREAM_ERROR_READ_FAILURE,
+' VBAsh_STREAM_ERROR_WRITE_FAILURE, and VBAsh_STREAM_ERROR_OPEN_FAILURE.
+' AtEndOfStream describes data exhaustion only; it is not a readability,
+' closed-state, or error indicator.
 ' ReadText returns at most maxChars; a non-positive limit returns empty text.
 ' WriteText returns the number of characters accepted. CloseStream is idempotent.
+' This contract is text-based and counts characters; it is not a binary stream API.
 Public Property Get CanRead() As Boolean
 End Property
 
