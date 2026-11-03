@@ -1,6 +1,6 @@
 # Streams — Log de execução
 
-Nenhum teste da fase Streams foi executado neste marco. `StreamContract` / `TestStreamContract` está escrito em `VBAshTests.bas`, incluindo a semântica de `AtEndOfStream` e o fechamento idempotente, mas permanece NOT RUN porque este ambiente não disponibiliza Excel/VBA. Não há resultado de execução a registrar. Isso não comprova que não houve execução em outro branch ou ambiente.
+Nenhum teste da fase Streams foi executado neste marco. `StreamContract` / `TestStreamContract` e `MemoryStream` / `TestMemoryStream` estão escritos em `VBAshTests.bas`, mas permanecem NOT RUN porque este ambiente não disponibiliza Excel/VBA. Não há resultado de execução a registrar. Isso não comprova que não houve execução em outro branch ou ambiente.
 
 Acrescente uma nova seção a cada execução real. Preserve entradas anteriores, inclusive as que terminarem em FAIL, ERROR ou BLOCKED. Não preencha campos com estimativas.
 
