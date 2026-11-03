@@ -4,6 +4,12 @@ Public gSession As clsSession
 Public gConsole As clsConsole
 Public gFDTable As clsFileDescriptorTable
 
+Public Const VBAsh_STREAM_ERROR_NOT_SUPPORTED As Long = vbObjectError + 1200
+Public Const VBAsh_STREAM_ERROR_CLOSED As Long = vbObjectError + 1201
+Public Const VBAsh_STREAM_ERROR_READ_FAILURE As Long = vbObjectError + 1202
+Public Const VBAsh_STREAM_ERROR_WRITE_FAILURE As Long = vbObjectError + 1203
+Public Const VBAsh_STREAM_ERROR_OPEN_FAILURE As Long = vbObjectError + 1204
+
 Public Sub Auto_Open()
     VBAsh_Start
 End Sub
