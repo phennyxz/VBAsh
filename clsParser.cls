@@ -80,11 +80,11 @@ Private Function ParseAndOr() As clsCommand
     Dim parentNode As clsCommand
     Dim operatorType As String
 
-    Set leftNode = ParseSimpleCommand()
+    Set leftNode = ParsePipeline()
     Do While IsLogicalOperator(CurrentTokenType())
         operatorType = CurrentTokenType()
         mIndex = mIndex + 1
-        Set rightNode = ParseSimpleCommand()
+        Set rightNode = ParsePipeline()
 
         Set parentNode = New clsCommand
         parentNode.InitAstNode operatorType, leftNode.SourceStart, rightNode.SourceEnd
@@ -94,6 +94,32 @@ Private Function ParseAndOr() As clsCommand
         Set leftNode = parentNode
     Loop
     Set ParseAndOr = leftNode
+End Function
+
+Private Function ParsePipeline() As clsCommand
+    Dim stages As New Collection
+    Dim node As clsCommand
+    Dim stage As clsCommand
+
+    stages.Add ParseSimpleCommand()
+    Do While CurrentTokenType() = "PIPE"
+        mIndex = mIndex + 1
+        stages.Add ParseSimpleCommand()
+    Loop
+
+    If stages.Count = 1 Then
+        Set ParsePipeline = stages(1)
+        Exit Function
+    End If
+
+    Set node = New clsCommand
+    Set stage = stages(1)
+    node.InitAstNode "PIPELINE", stage.SourceStart, stages(stages.Count).SourceEnd
+    node.OriginalText = mOriginalText
+    For Each stage In stages
+        node.AddChild stage
+    Next stage
+    Set ParsePipeline = node
 End Function
 
 Private Function ParseSimpleCommand() As clsCommand
@@ -111,6 +137,7 @@ Private Function ParseSimpleCommand() As clsCommand
     startPosition = CurrentSourceStart()
 
     Do While CurrentTokenType() <> "EOF" And CurrentTokenType() <> "SEMI" And _
+             CurrentTokenType() <> "PIPE" And _
              Not IsLogicalOperator(CurrentTokenType())
         Set token = CurrentToken()
         Select Case token.TokenType
