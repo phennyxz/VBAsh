@@ -43,6 +43,7 @@ Public Sub VBAsh_RunTests()
     RunTest "Redirection"
     RunTest "StreamContract"
     RunTest "MemoryStream"
+    RunTest "NullStream"
 
     finishedAt = Now
     summary = TestRunSummary()
@@ -91,6 +92,7 @@ Private Sub RunTest(ByVal testName As String)
         Case "Redirection": TestRedirection
         Case "StreamContract": TestStreamContract
         Case "MemoryStream": TestMemoryStream
+        Case "NullStream": TestNullStream
         Case Else
             Err.Raise vbObjectError + 1102, "VBAshTests.RunTest", _
                       "Teste não registrado: " & testName
@@ -1391,6 +1393,91 @@ Private Sub TestMemoryStream()
     AssertEqual 1, memory.Position, "unsupported write preserves disabled-stream position"
     AssertTrue Not stream.CanRead, "unsupported write preserves disabled-stream read capability"
     AssertTrue Not stream.CanWrite, "unsupported write preserves disabled-stream write capability"
+End Sub
+
+Private Sub TestNullStream()
+    Dim nullStream As clsNullStream
+    Dim stream As IStream
+    Dim errorNumber As Long
+
+    Set nullStream = New clsNullStream
+    Set stream = nullStream
+    AssertTrue stream.CanRead, "null stream is readable by default"
+    AssertTrue stream.CanWrite, "null stream is writable by default"
+    AssertTrue Not stream.IsClosed, "null stream starts open"
+    AssertTrue Not stream.HasError, "null stream starts without error"
+    AssertEqual 0, stream.LastErrorNumber, "initial error number is zero"
+    AssertEqual "", stream.LastErrorDescription, "initial error description is empty"
+    AssertTrue stream.AtEndOfStream, "open null stream is at EOF"
+
+    AssertEqual "", stream.ReadText(10), "read returns empty text"
+    AssertEqual "", stream.ReadText(0), "zero-limit read returns empty text"
+    AssertEqual "", stream.ReadText(-1), "negative-limit read returns empty text"
+    AssertTrue stream.AtEndOfStream, "read keeps EOF"
+
+    AssertEqual 0, stream.WriteText(""), "empty write returns zero"
+    AssertEqual 1, stream.WriteText("a"), "one-char write returns one"
+    AssertEqual 11, stream.WriteText("hello" & vbCrLf & "abc"), "multi-line write counts all characters"
+    AssertEqual 100000, stream.WriteText(String$(100000, "x")), "large write returns full length"
+    AssertEqual "", stream.ReadText(100), "written content is not stored"
+    AssertTrue stream.AtEndOfStream, "write does not change EOF"
+    AssertTrue Not stream.HasError, "successful operations leave no error"
+
+    stream.CloseStream
+    AssertTrue stream.IsClosed, "close marks null stream closed"
+    AssertTrue stream.CanRead, "close keeps read capability"
+    AssertTrue stream.CanWrite, "close keeps write capability"
+    AssertTrue Not stream.AtEndOfStream, "closed null stream is not at EOF"
+    AssertTrue Not stream.HasError, "close leaves no error"
+    stream.CloseStream
+    AssertTrue stream.IsClosed, "repeated close keeps stream closed"
+    AssertTrue Not stream.HasError, "repeated close leaves no error"
+
+    On Error Resume Next
+    stream.ReadText 1
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, errorNumber, "read after close raises closed error"
+    AssertTrue stream.HasError, "read after close records error"
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, "read after close exposes code"
+    AssertTrue Len(stream.LastErrorDescription) > 0, "read after close exposes description"
+
+    On Error Resume Next
+    stream.WriteText "x"
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, errorNumber, "write after close raises closed error"
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, "write after close exposes code"
+    stream.CloseStream
+    AssertTrue Not stream.HasError, "close clears prior error"
+
+    nullStream.Initialize
+    AssertTrue Not stream.IsClosed, "Initialize reopens the stream"
+    AssertEqual 3, stream.WriteText("abc"), "write works after reinitialize"
+
+    nullStream.Initialize True, False
+    AssertTrue stream.CanRead And Not stream.CanWrite, "read-only configuration"
+    On Error Resume Next
+    stream.WriteText "x"
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, "write on non-writable raises unsupported"
+    AssertEqual "", stream.ReadText(1), "successful read after failure"
+    AssertTrue Not stream.HasError, "successful read clears prior error"
+
+    nullStream.Initialize False, True
+    AssertTrue Not stream.AtEndOfStream, "non-readable null stream is not at EOF"
+    On Error Resume Next
+    stream.ReadText 1
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, "read on non-readable raises unsupported"
+    AssertEqual 2, stream.WriteText("ok"), "successful write after failure"
+    AssertTrue Not stream.HasError, "successful write clears prior error"
 End Sub
 
 Private Function ReadRedirectedFile(ByVal fileSystem As Object, ByVal path As String, _
