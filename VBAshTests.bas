@@ -9,7 +9,7 @@ Private mTestResults As Collection
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
-Private Const EXPECTED_TEST_COUNT As Long = 13
+Private Const EXPECTED_TEST_COUNT As Long = 14
 
 Public Sub VBAsh_RunTests()
     Dim startedAt As Date
@@ -41,6 +41,7 @@ Public Sub VBAsh_RunTests()
     RunTest "ForLoops"
     RunTest "ErrorsAndExitStatus"
     RunTest "Redirection"
+    RunTest "StreamContract"
 
     finishedAt = Now
     summary = TestRunSummary()
@@ -87,6 +88,7 @@ Private Sub RunTest(ByVal testName As String)
         Case "ForLoops": TestForLoops
         Case "ErrorsAndExitStatus": TestErrorsAndExitStatus
         Case "Redirection": TestRedirection
+        Case "StreamContract": TestStreamContract
         Case Else
             Err.Raise vbObjectError + 1102, "VBAshTests.RunTest", _
                       "Teste não registrado: " & testName
@@ -1113,6 +1115,66 @@ Private Sub TestRedirection()
     fileSystem.DeleteFile mergePath, True
     fileSystem.DeleteFile variablePath, True
     fileSystem.DeleteFile sequenceVariablePath, True
+End Sub
+
+Private Sub TestStreamContract()
+    Dim probe As clsStreamContractProbe
+    Dim stream As IStream
+    Dim errorNumber As Long
+
+    Set probe = New clsStreamContractProbe
+    Set stream = probe
+    AssertTrue Not stream.IsClosed, "new stream starts open"
+    AssertTrue stream.CanRead, "stream contract reports readable capability"
+    AssertTrue stream.CanWrite, "stream contract reports writable capability"
+    AssertTrue stream.AtEndOfStream, "empty readable stream starts at EOF"
+    AssertEqual 3, stream.WriteText("abc"), "stream contract reports written character count"
+    AssertTrue Not stream.AtEndOfStream, "writing data clears EOF state"
+    AssertEqual "ab", stream.ReadText(2), "stream contract reads a bounded chunk"
+    AssertTrue Not stream.AtEndOfStream, "partial read is not EOF"
+    AssertEqual "c", stream.ReadText(2), "stream contract reads remaining data"
+    AssertTrue stream.AtEndOfStream, "stream contract reports EOF after final read"
+    AssertEqual "", stream.ReadText(0), "zero-length read returns empty text"
+
+    probe.ConfigureCapabilities False, True
+    On Error Resume Next
+    stream.ReadText 1
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, _
+                "unsupported read raises the contract error"
+    AssertTrue stream.HasError, "unsupported read records error state"
+    AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, stream.LastErrorNumber, _
+                "stream exposes error number"
+    AssertTrue Len(stream.LastErrorDescription) > 0, "stream exposes error description"
+
+    probe.ConfigureCapabilities True, True
+    AssertEqual "", stream.ReadText(0), "non-positive read limit returns empty text"
+    AssertTrue Not stream.HasError, "successful operation clears the error state"
+
+    probe.ConfigureCapabilities True, False
+    On Error Resume Next
+    stream.WriteText "x"
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, _
+                "unsupported write raises the contract error"
+    AssertTrue stream.HasError, "unsupported write records error state"
+
+    stream.CloseStream
+    AssertTrue stream.IsClosed, "stream contract reports closed state"
+    AssertTrue stream.AtEndOfStream, "closed stream reports EOF"
+    AssertTrue Not stream.HasError, "successful close clears error state"
+    On Error Resume Next
+    stream.ReadText 1
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, _
+                "operation on a closed stream raises the contract error"
+    AssertTrue stream.HasError, "operation on a closed stream records error state"
 End Sub
 
 Private Function ReadRedirectedFile(ByVal fileSystem As Object, ByVal path As String, _

@@ -1,6 +1,6 @@
 # Streams — Log de execução
 
-Não há execução de testes da fase Streams registrada no snapshot consultado. Isso não comprova que não houve execução em outro branch ou ambiente.
+Nenhum teste da fase Streams foi executado neste marco. `StreamContract` / `TestStreamContract` foi adicionado a `VBAshTests.bas`, mas está NOT RUN; não há resultado de execução a registrar. Isso não comprova que não houve execução em outro branch ou ambiente.
 
 Acrescente uma nova seção a cada execução real. Preserve entradas anteriores, inclusive as que terminarem em FAIL, ERROR ou BLOCKED. Não preencha campos com estimativas.
 
