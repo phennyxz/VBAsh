@@ -9,7 +9,7 @@ Private mTestResults As Collection
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
-Private Const EXPECTED_TEST_COUNT As Long = 14
+Private Const EXPECTED_TEST_COUNT As Long = 15
 
 Public Sub VBAsh_RunTests()
     Dim startedAt As Date
@@ -42,6 +42,7 @@ Public Sub VBAsh_RunTests()
     RunTest "ErrorsAndExitStatus"
     RunTest "Redirection"
     RunTest "StreamContract"
+    RunTest "NullStream"
 
     finishedAt = Now
     summary = TestRunSummary()
@@ -89,6 +90,7 @@ Private Sub RunTest(ByVal testName As String)
         Case "ErrorsAndExitStatus": TestErrorsAndExitStatus
         Case "Redirection": TestRedirection
         Case "StreamContract": TestStreamContract
+        Case "NullStream": TestNullStream
         Case Else
             Err.Raise vbObjectError + 1102, "VBAshTests.RunTest", _
                       "Teste não registrado: " & testName
@@ -1205,6 +1207,98 @@ Private Sub TestStreamContract()
     AssertTrue stream.HasError, "operation on a closed stream records error state"
     AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, _
                 "closed-stream error has its distinct code"
+End Sub
+
+Private Sub TestNullStream()
+    Dim nullStream As clsNullStream
+    Dim stream As IStream
+    Dim errorNumber As Long
+
+    Set nullStream = New clsNullStream
+    Set stream = nullStream
+    AssertTrue Not stream.IsClosed, "new null stream starts open"
+    AssertTrue stream.CanRead, "null stream supports reading"
+    AssertTrue stream.CanWrite, "null stream supports writing"
+    AssertTrue stream.AtEndOfStream, "open null stream starts at EOF"
+    AssertTrue Not stream.HasError, "new null stream has no error"
+    AssertEqual 0, stream.LastErrorNumber, "new null stream error number is clear"
+    AssertEqual "", stream.LastErrorDescription, "new null stream error description is clear"
+
+    AssertEqual "", stream.ReadText(10), "null stream always reads empty text"
+    AssertEqual "", stream.ReadText(0), "null stream accepts a zero-length read"
+    AssertEqual "", stream.ReadText(-1), "null stream accepts a negative read limit"
+    AssertTrue stream.AtEndOfStream, "null stream remains at EOF after reading"
+    AssertTrue Not stream.HasError, "valid reads do not set an error"
+    AssertEqual 0, stream.LastErrorNumber, "valid reads clear the error number"
+    AssertEqual "", stream.LastErrorDescription, "valid reads clear the error description"
+
+    AssertEqual Len("discard me"), stream.WriteText("discard me"), _
+                "null stream reports the number of characters written"
+    AssertEqual 0, stream.WriteText(""), "null stream accepts an empty write"
+    AssertEqual Len("second write"), stream.WriteText("second write"), _
+                "null stream reports successive writes"
+    AssertEqual "", stream.ReadText(100), "writes are discarded instead of becoming readable"
+    AssertTrue stream.AtEndOfStream, "writes do not change null stream EOF"
+    AssertTrue Not stream.HasError, "valid writes do not set an error"
+    AssertEqual 0, stream.LastErrorNumber, "valid writes leave the error number clear"
+    AssertEqual "", stream.LastErrorDescription, "valid writes leave the error description clear"
+
+    stream.CloseStream
+    AssertTrue stream.IsClosed, "close marks the null stream closed"
+    AssertTrue stream.CanRead, "closing preserves read capability"
+    AssertTrue stream.CanWrite, "closing preserves write capability"
+    AssertTrue Not stream.AtEndOfStream, "closed null stream is outside EOF semantics"
+    AssertTrue Not stream.HasError, "successful close leaves no error"
+    AssertEqual 0, stream.LastErrorNumber, "successful close clears the error number"
+    AssertEqual "", stream.LastErrorDescription, "successful close clears the error description"
+
+    On Error Resume Next
+    stream.CloseStream
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual 0, errorNumber, "closing an already closed null stream is idempotent"
+    AssertTrue stream.IsClosed, "repeated close keeps the null stream closed"
+
+    On Error Resume Next
+    stream.ReadText 1
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, errorNumber, _
+                "reading a closed null stream raises the closed-stream error"
+    AssertTrue stream.HasError, "closed-stream read records an error"
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, _
+                "closed-stream read records the contract error number"
+    AssertTrue Len(stream.LastErrorDescription) > 0, _
+               "closed-stream read records an error description"
+    AssertTrue stream.IsClosed, "failed read does not reopen the null stream"
+    AssertTrue stream.CanRead, "failed read does not change read capability"
+    AssertTrue stream.CanWrite, "failed read does not change write capability"
+    AssertTrue Not stream.AtEndOfStream, "closed stream remains outside EOF semantics after error"
+
+    On Error Resume Next
+    stream.WriteText "discarded"
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, errorNumber, _
+                "writing a closed null stream raises the closed-stream error"
+    AssertTrue stream.HasError, "closed-stream write records an error"
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, _
+                "closed-stream write records the contract error number"
+    AssertTrue Len(stream.LastErrorDescription) > 0, _
+               "closed-stream write records an error description"
+    AssertTrue stream.IsClosed, "failed write does not reopen the null stream"
+    AssertTrue stream.CanRead, "failed write does not change read capability"
+    AssertTrue stream.CanWrite, "failed write does not change write capability"
+    AssertTrue Not stream.AtEndOfStream, "closed stream remains outside EOF semantics after write error"
+
+    stream.CloseStream
+    AssertTrue Not stream.HasError, "successful repeated close clears a previous error"
+    AssertEqual 0, stream.LastErrorNumber, "successful repeated close clears the error number"
+    AssertEqual "", stream.LastErrorDescription, _
+                "successful repeated close clears the error description"
 End Sub
 
 Private Function ReadRedirectedFile(ByVal fileSystem As Object, ByVal path As String, _
