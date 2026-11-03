@@ -1153,6 +1153,10 @@ Private Sub TestStreamContract()
     On Error GoTo 0
     AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, _
                 "unsupported read raises the contract error"
+    AssertTrue Not stream.CanRead, "read error does not change read capability"
+    AssertTrue Not stream.IsClosed, "read error does not change closed state"
+    AssertTrue Not stream.AtEndOfStream, _
+               "EOF is false when reading is unsupported, even after consuming data"
     AssertTrue stream.HasError, "unsupported read records error state"
     AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, stream.LastErrorNumber, _
                 "stream exposes error number"
@@ -1170,10 +1174,15 @@ Private Sub TestStreamContract()
     On Error GoTo 0
     AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, _
                 "unsupported write raises the contract error"
+    AssertTrue Not stream.CanWrite, "write error does not change write capability"
+    AssertTrue Not stream.IsClosed, "write error does not change closed state"
+    AssertTrue stream.AtEndOfStream, _
+               "write error does not change EOF on an exhausted readable stream"
     AssertTrue stream.HasError, "unsupported write records error state"
 
     stream.CloseStream
     AssertTrue stream.IsClosed, "stream contract reports closed state"
+    AssertTrue stream.CanRead, "closing does not rewrite read capability"
     AssertTrue Not stream.AtEndOfStream, "closed state is distinct from EOF"
     AssertTrue Not stream.HasError, "successful close clears error state"
     On Error Resume Next
@@ -1190,6 +1199,9 @@ Private Sub TestStreamContract()
     On Error GoTo 0
     AssertEqual VBAsh_STREAM_ERROR_CLOSED, errorNumber, _
                 "operation on a closed stream raises the closed-stream error"
+    AssertTrue stream.IsClosed, "closed-stream error does not change closed state"
+    AssertTrue stream.CanRead, "closed-stream error does not change read capability"
+    AssertTrue Not stream.AtEndOfStream, "closed stream remains outside EOF semantics"
     AssertTrue stream.HasError, "operation on a closed stream records error state"
     AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, _
                 "closed-stream error has its distinct code"

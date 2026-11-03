@@ -6,8 +6,10 @@ Option Explicit
 ' a closed stream raise VBAsh_STREAM_ERROR_CLOSED. Read, write, and open failures
 ' have separate reserved codes: VBAsh_STREAM_ERROR_READ_FAILURE,
 ' VBAsh_STREAM_ERROR_WRITE_FAILURE, and VBAsh_STREAM_ERROR_OPEN_FAILURE.
-' AtEndOfStream describes data exhaustion only; it is not a readability,
-' closed-state, or error indicator.
+' CanRead reports only read capability; IsClosed reports only closed state;
+' HasError reports only whether an operation failed.
+' AtEndOfStream is meaningful only on open, readable streams. It returns False
+' for non-readable or closed streams; otherwise it reports data exhaustion.
 ' ReadText returns at most maxChars; a non-positive limit returns empty text.
 ' WriteText returns the number of characters accepted. CloseStream is idempotent.
 ' This contract is text-based and counts characters; it is not a binary stream API.
