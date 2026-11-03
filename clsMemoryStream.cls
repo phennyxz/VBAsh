@@ -64,6 +64,8 @@ End Property
 
 Private Function IStream_ReadText(ByVal maxChars As Long) As String
     Dim remainingChars As Long
+    Dim originalErrorNumber As Long
+    Dim originalErrorDescription As String
 
     If mIsClosed Then
         RaiseStreamError VBAsh_STREAM_ERROR_CLOSED, "Stream is closed."
@@ -74,14 +76,28 @@ Private Function IStream_ReadText(ByVal maxChars As Long) As String
     ClearStreamError
     If maxChars <= 0 Then Exit Function
 
+    On Error GoTo ReadFailure
     remainingChars = Len(mBuffer) - mPosition + 1
     If remainingChars <= 0 Then Exit Function
     If remainingChars > maxChars Then remainingChars = maxChars
     IStream_ReadText = Mid$(mBuffer, mPosition, remainingChars)
     mPosition = mPosition + remainingChars
+    Exit Function
+
+ReadFailure:
+    originalErrorNumber = Err.Number
+    originalErrorDescription = Err.Description
+    On Error GoTo 0
+    RaiseStreamError VBAsh_STREAM_ERROR_READ_FAILURE, _
+                     StreamFailureDescription("Read", originalErrorNumber, originalErrorDescription)
 End Function
 
 Private Function IStream_WriteText(ByVal text As String) As Long
+    Dim newBuffer As String
+    Dim writtenChars As Long
+    Dim originalErrorNumber As Long
+    Dim originalErrorDescription As String
+
     If mIsClosed Then
         RaiseStreamError VBAsh_STREAM_ERROR_CLOSED, "Stream is closed."
     End If
@@ -89,9 +105,20 @@ Private Function IStream_WriteText(ByVal text As String) As Long
         RaiseStreamError VBAsh_STREAM_ERROR_NOT_SUPPORTED, "Stream does not support writing."
     End If
     ClearStreamError
+    On Error GoTo WriteFailure
+    writtenChars = Len(text)
+    newBuffer = mBuffer & text
     ' Writes append to the buffer without moving the read position.
-    mBuffer = mBuffer & text
-    IStream_WriteText = Len(text)
+    IStream_WriteText = writtenChars
+    mBuffer = newBuffer
+    Exit Function
+
+WriteFailure:
+    originalErrorNumber = Err.Number
+    originalErrorDescription = Err.Description
+    On Error GoTo 0
+    RaiseStreamError VBAsh_STREAM_ERROR_WRITE_FAILURE, _
+                     StreamFailureDescription("Write", originalErrorNumber, originalErrorDescription)
 End Function
 
 Private Sub IStream_CloseStream()
@@ -109,3 +136,12 @@ Private Sub ClearStreamError()
     mLastErrorNumber = 0
     mLastErrorDescription = ""
 End Sub
+
+Private Function StreamFailureDescription(ByVal operation As String, _
+                                          ByVal originalErrorNumber As Long, _
+                                          ByVal originalDescription As String) As String
+    StreamFailureDescription = operation & " failed (error " & CStr(originalErrorNumber) & ")"
+    If Len(originalDescription) > 0 Then
+        StreamFailureDescription = StreamFailureDescription & ": " & originalDescription
+    End If
+End Function

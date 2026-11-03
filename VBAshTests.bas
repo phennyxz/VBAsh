@@ -1266,7 +1266,11 @@ Private Sub TestMemoryStream()
                 "unsupported write exposes its error code"
     AssertTrue Len(stream.LastErrorDescription) > 0, _
                "unsupported write exposes its error description"
-    AssertTrue Not stream.AtEndOfStream, "read-only stream is not at EOF after unsupported write"
+    AssertTrue stream.AtEndOfStream, "unsupported write preserves EOF after consuming all readable text"
+    AssertEqual "input", memory.Contents, "unsupported write preserves buffer contents"
+    AssertEqual 6, memory.Position, "unsupported write preserves read position"
+    AssertTrue stream.CanRead, "unsupported write preserves read capability"
+    AssertTrue Not stream.CanWrite, "unsupported write preserves write capability"
 
     memory.Initialize "", False, True
     AssertTrue Not stream.CanRead, "write-only initialization disables reading"
@@ -1279,16 +1283,37 @@ Private Sub TestMemoryStream()
     On Error GoTo 0
     AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, _
                 "read on write-only stream raises unsupported error"
+    AssertEqual "", memory.Contents, "unsupported read preserves buffer contents"
+    AssertEqual 1, memory.Position, "unsupported read preserves read position"
+    AssertTrue Not stream.CanRead, "unsupported read preserves read capability"
+    AssertTrue stream.CanWrite, "unsupported read preserves write capability"
     AssertEqual 3, stream.WriteText("new"), "write-only stream accepts text"
     AssertEqual "new", memory.Contents, "write-only stream stores written text"
     AssertEqual 1, memory.Position, "write-only stream writes do not move read position"
     AssertTrue Not stream.HasError, "successful write clears prior error state"
 
     memory.Initialize
-    AssertTrue stream.AtEndOfStream = False, "empty unreadable stream is not at EOF"
-    memory.Initialize "", True, True
+    AssertTrue stream.CanRead, "empty stream is configured as readable"
+    AssertTrue stream.CanWrite, "empty stream is configured as writable by default"
+    AssertEqual "", memory.Contents, "readable stream starts with empty content"
+    AssertEqual 1, memory.Position, "empty readable stream starts at position one"
     AssertTrue stream.AtEndOfStream, "empty readable stream starts at EOF"
+    AssertEqual "", stream.ReadText(1), "read from initially empty stream returns empty text"
+    AssertEqual 1, memory.Position, "read from empty stream preserves position"
 
+    memory.Initialize "end", True, True
+    AssertEqual "end", stream.ReadText(10), "read reaches the end before append"
+    AssertEqual 4, memory.Position, "position after reaching EOF is preserved as the next index"
+    AssertTrue stream.AtEndOfStream, "stream reaches EOF before append"
+    AssertEqual 2, stream.WriteText("XY"), "write after EOF reports appended character count"
+    AssertEqual "endXY", memory.Contents, "write after EOF appends new content"
+    AssertEqual 4, memory.Position, "write after EOF preserves the prior position"
+    AssertTrue Not stream.AtEndOfStream, "appended content makes the stream non-EOF"
+    AssertEqual "XY", stream.ReadText(10), "newly appended content is readable"
+    AssertEqual 6, memory.Position, "reading appended content advances position"
+    AssertTrue stream.AtEndOfStream, "reading appended content reaches EOF again"
+
+    memory.Initialize "closed", True, True
     stream.CloseStream
     AssertTrue stream.IsClosed, "close marks memory stream closed"
     AssertTrue stream.CanRead, "close does not change read capability"
@@ -1309,6 +1334,25 @@ Private Sub TestMemoryStream()
     AssertTrue stream.IsClosed, "closed-stream error preserves closed state"
     AssertTrue stream.CanRead, "closed-stream error preserves read capability"
     AssertTrue Not stream.AtEndOfStream, "closed-stream error does not imply EOF"
+    AssertEqual "closed", memory.Contents, "closed-stream read failure preserves buffer contents"
+    AssertEqual 1, memory.Position, "closed-stream read failure preserves position"
+    On Error Resume Next
+    stream.WriteText "x"
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, errorNumber, _
+                "write after close raises closed-stream error"
+    AssertTrue stream.HasError, "write after close records error state"
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, _
+                "write after close records closed-stream error code"
+    AssertTrue Len(stream.LastErrorDescription) > 0, _
+               "write after close records error description"
+    AssertEqual "closed", memory.Contents, "closed-stream write failure preserves buffer contents"
+    AssertEqual 1, memory.Position, "closed-stream write failure preserves position"
+    AssertTrue stream.IsClosed, "closed-stream write failure preserves closed state"
+    AssertTrue stream.CanRead, "closed-stream write failure preserves read capability"
+    AssertTrue stream.CanWrite, "closed-stream write failure preserves write capability"
 
     memory.Initialize "fresh", False, True
     AssertTrue Not stream.IsClosed, "reinitialization reopens the stream"
@@ -1320,6 +1364,33 @@ Private Sub TestMemoryStream()
     AssertTrue Not stream.AtEndOfStream, "reinitialized write-only stream is not at EOF"
     AssertEqual 1, stream.WriteText("!"), "reinitialized stream accepts writes"
     AssertEqual "fresh!", memory.Contents, "write after reinitialization appends to new content"
+
+    memory.Initialize "blocked", False, False
+    AssertTrue Not stream.CanRead, "disabled stream reports no read capability"
+    AssertTrue Not stream.CanWrite, "disabled stream reports no write capability"
+    AssertTrue Not stream.AtEndOfStream, "disabled stream is not reported at EOF"
+    On Error Resume Next
+    stream.ReadText 1
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, _
+                "read on disabled stream raises unsupported error"
+    AssertEqual "blocked", memory.Contents, "unsupported read preserves disabled-stream content"
+    AssertEqual 1, memory.Position, "unsupported read preserves disabled-stream position"
+    AssertTrue Not stream.CanRead, "unsupported read preserves disabled-stream read capability"
+    AssertTrue Not stream.CanWrite, "unsupported read preserves disabled-stream write capability"
+    On Error Resume Next
+    stream.WriteText "x"
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, _
+                "write on disabled stream raises unsupported error"
+    AssertEqual "blocked", memory.Contents, "unsupported write preserves disabled-stream content"
+    AssertEqual 1, memory.Position, "unsupported write preserves disabled-stream position"
+    AssertTrue Not stream.CanRead, "unsupported write preserves disabled-stream read capability"
+    AssertTrue Not stream.CanWrite, "unsupported write preserves disabled-stream write capability"
 End Sub
 
 Private Function ReadRedirectedFile(ByVal fileSystem As Object, ByVal path As String, _
