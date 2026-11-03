@@ -340,6 +340,54 @@ Private Sub TestParserAst()
     AssertEqual "AND_IF", node.Children(1).NodeType, "first sequence item keeps logical tree"
     AssertEqual "OR_IF", node.Children(2).NodeType, "second sequence item keeps logical tree"
 
+    Set node = parser.ParseAst(tokenizer.Tokenize("a | b"), "a | b")
+    AssertEqual "PIPELINE", node.NodeType, "pipe creates pipeline node"
+    AssertEqual 2, node.Children.Count, "pipeline preserves two stages"
+    Set child = node.Children(1)
+    AssertEqual "SIMPLE_COMMAND", child.NodeType, "first pipeline stage is simple command"
+    AssertEqual "a", child.Name, "first pipeline stage order"
+    Set child = node.Children(2)
+    AssertEqual "SIMPLE_COMMAND", child.NodeType, "second pipeline stage is simple command"
+    AssertEqual "b", child.Name, "second pipeline stage order"
+    AssertEqual 1, node.SourceStart, "pipeline starts at first stage"
+    AssertEqual 5, node.SourceEnd, "pipeline ends at final stage"
+    AssertEqual "a | b", Mid$("a | b", node.SourceStart, node.SourceEnd - node.SourceStart + 1), _
+                "pipeline source span covers its stages"
+
+    Set node = parser.ParseAst(tokenizer.Tokenize("a | b | c"), "a | b | c")
+    AssertEqual "PIPELINE", node.NodeType, "three-stage pipeline node"
+    AssertEqual 3, node.Children.Count, "pipeline preserves three stages"
+    AssertEqual "a", node.Children(1).Name, "three-stage pipeline first stage order"
+    AssertEqual "b", node.Children(2).Name, "three-stage pipeline second stage order"
+    AssertEqual "c", node.Children(3).Name, "three-stage pipeline final stage order"
+
+    Set node = parser.ParseAst(tokenizer.Tokenize("a | b && c | d; e"), "a | b && c | d; e")
+    AssertEqual "SEQUENCE", node.NodeType, "pipeline expression followed by semicolon is sequence"
+    AssertEqual "AND_IF", node.Children(1).NodeType, "and-if is above sequence"
+    AssertEqual "PIPELINE", node.Children(1).Children(1).NodeType, "pipeline is above and-if"
+    AssertEqual "PIPELINE", node.Children(1).Children(2).NodeType, "right pipeline is above and-if"
+    AssertEqual "SIMPLE_COMMAND", node.Children(2).NodeType, "final sequence child is simple command"
+    AssertEqual "e", node.Children(2).Name, "final sequence command remains ordered"
+
+    Set node = parser.ParseAst(tokenizer.Tokenize("echo ""a | b"""), "echo ""a | b""")
+    AssertEqual "SIMPLE_COMMAND", node.NodeType, "double-quoted pipe is not an operator"
+    AssertEqual "a | b", node.Args(1), "double-quoted pipe remains in word"
+    Set node = parser.ParseAst(tokenizer.Tokenize("echo 'a | b'"), "echo 'a | b'")
+    AssertEqual "SIMPLE_COMMAND", node.NodeType, "single-quoted pipe is not an operator"
+    AssertEqual "a | b", node.Args(1), "single-quoted pipe remains in word"
+
+    Set node = parser.ParseAst(tokenizer.Tokenize("a > out | b"), "a > out | b")
+    AssertEqual "PIPELINE", node.NodeType, "redirection before pipe remains in pipeline"
+    AssertEqual 1, node.Children(1).Redirections.Count, "first stage retains redirection"
+    AssertEqual "out", node.Children(1).Redirections(1).Target, "first-stage redirection target"
+    AssertEqual 0, node.Children(2).Redirections.Count, "second stage has no first-stage redirection"
+    Set node = parser.ParseAst(tokenizer.Tokenize("a | b 2> err"), "a | b 2> err")
+    AssertEqual 0, node.Children(1).Redirections.Count, "first stage has no second-stage redirection"
+    AssertEqual 1, node.Children(2).Redirections.Count, "second stage retains redirection"
+    AssertEqual "REDIR_ERR", node.Children(2).Redirections(1).Operator, _
+                "second-stage redirection operator"
+    AssertEqual "err", node.Children(2).Redirections(1).Target, "second-stage redirection target"
+
     Set node = parser.ParseAst(tokenizer.Tokenize("echo hi > out"), "echo hi > out")
     AssertEqual "SIMPLE_COMMAND", node.NodeType, "redirection remains part of simple command"
     AssertEqual 1, node.Redirections.Count, "existing redirection parsing is preserved"
@@ -352,9 +400,13 @@ Private Sub TestParserAst()
     AssertAstSyntaxError tokenizer, parser, "a &&", "incomplete and-if is rejected"
     AssertAstSyntaxError tokenizer, parser, "a ||", "incomplete or-if is rejected"
     AssertAstSyntaxError tokenizer, parser, "a && || b", "consecutive logical operators are rejected"
-    AssertAstSyntaxError tokenizer, parser, "a | b", "out-of-scope pipeline operator is rejected"
+    AssertAstSyntaxError tokenizer, parser, "| a", "leading pipeline operator is rejected"
+    AssertAstSyntaxError tokenizer, parser, "a |", "trailing pipeline operator is rejected"
+    AssertAstSyntaxError tokenizer, parser, "a | | b", "consecutive pipeline operators are rejected"
+    AssertAstSyntaxError tokenizer, parser, "a ||| b", "mixed logical and pipeline operators are rejected"
     AssertLegacyParseError tokenizer, parser, "echo a;", "legacy Parse continues rejecting separators"
     AssertLegacyParseError tokenizer, parser, "a && b", "legacy Parse continues rejecting logical lists"
+    AssertLegacyParseError tokenizer, parser, "a | b", "legacy Parse continues rejecting pipelines"
 
 End Sub
 
@@ -709,6 +761,16 @@ Private Sub TestAstExecution()
                 "a || b && c executes final command according to left associativity"
     AssertEqual 0, session.LastExitCode, "a || b && c returns final executed status"
     AssertTrue Len(result) > 0, "nested logical expression preserves executed stdout"
+
+    result = session.ProcessInput("export VBAsh_AST_PIPELINE=unexpected | echo ignored")
+    AssertEqual "", result, "unsupported pipeline emits no partial output"
+    AssertEqual 2, session.LastExitCode, "unsupported pipeline returns syntax-class error status"
+    AssertEqual "VBAsh: Execução de pipelines ainda não é suportada.", _
+                session.ErrorOutput, "unsupported pipeline reports explicit error"
+    AssertTrue session.HasErrorOutput, "unsupported pipeline reports stderr"
+    AssertTrue Not session.HasOutput, "unsupported pipeline reports no stdout"
+    AssertTrue Not session.Env.Exists("VBAsh_AST_PIPELINE"), _
+               "unsupported pipeline does not execute its first stage"
 End Sub
 
 Private Sub TestEnvironment()

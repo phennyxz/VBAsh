@@ -31,7 +31,7 @@ End Sub
 
 Public Sub InitAstNode(ByVal pNodeType As String, ByVal pSourceStart As Long, ByVal pSourceEnd As Long)
     Select Case pNodeType
-        Case "SIMPLE_COMMAND", "SEQUENCE", "AND_IF", "OR_IF"
+        Case "SIMPLE_COMMAND", "PIPELINE", "SEQUENCE", "AND_IF", "OR_IF"
             NodeType = pNodeType
         Case Else
             Err.Raise vbObjectError + 1080, "clsCommand.InitAstNode", _

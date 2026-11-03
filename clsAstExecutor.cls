@@ -19,6 +19,9 @@ Private Function ExecuteNode(ByVal session As clsSession, ByVal node As clsComma
             ExecuteNode = ExecuteSequence(session, node)
         Case "AND_IF", "OR_IF"
             ExecuteNode = ExecuteLogical(session, node)
+        Case "PIPELINE"
+            Err.Raise vbObjectError + 1125, "clsAstExecutor.ExecuteNode", _
+                      "Execução de pipelines ainda não é suportada."
         Case Else
             Err.Raise vbObjectError + 1122, "clsAstExecutor.ExecuteNode", _
                       "Tipo de nó AST não executável: " & node.NodeType
