@@ -9,7 +9,7 @@ Private mTestResults As Collection
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
-Private Const EXPECTED_TEST_COUNT As Long = 15
+Private Const EXPECTED_TEST_COUNT As Long = 16
 
 Public Sub VBAsh_RunTests()
     Dim startedAt As Date
@@ -1417,7 +1417,7 @@ Private Sub TestNullStream()
 
     AssertEqual 0, stream.WriteText(""), "empty write returns zero"
     AssertEqual 1, stream.WriteText("a"), "one-char write returns one"
-    AssertEqual 11, stream.WriteText("hello" & vbCrLf & "abc"), "multi-line write counts all characters"
+    AssertEqual 10, stream.WriteText("hello" & vbCrLf & "abc"), "multi-line write counts all characters"
     AssertEqual 100000, stream.WriteText(String$(100000, "x")), "large write returns full length"
     AssertEqual "", stream.ReadText(100), "written content is not stored"
     AssertTrue stream.AtEndOfStream, "write does not change EOF"
