@@ -9,7 +9,7 @@ Private mTestResults As Collection
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
-Private Const EXPECTED_TEST_COUNT As Long = 15
+Private Const EXPECTED_TEST_COUNT As Long = 17
 
 Public Sub VBAsh_RunTests()
     Dim startedAt As Date
@@ -44,6 +44,7 @@ Public Sub VBAsh_RunTests()
     RunTest "StreamContract"
     RunTest "MemoryStream"
     RunTest "NullStream"
+    RunTest "FileStream"
 
     finishedAt = Now
     summary = TestRunSummary()
@@ -93,6 +94,7 @@ Private Sub RunTest(ByVal testName As String)
         Case "StreamContract": TestStreamContract
         Case "MemoryStream": TestMemoryStream
         Case "NullStream": TestNullStream
+        Case "FileStream": TestFileStream
         Case Else
             Err.Raise vbObjectError + 1102, "VBAshTests.RunTest", _
                       "Teste não registrado: " & testName
@@ -1478,6 +1480,252 @@ Private Sub TestNullStream()
     AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, "read on non-readable raises unsupported"
     AssertEqual 2, stream.WriteText("ok"), "successful write after failure"
     AssertTrue Not stream.HasError, "successful write clears prior error"
+End Sub
+
+Private Sub TestFileStream()
+    Dim fileSystem As Object
+    Dim seedStream As Object
+    Dim fileStream As clsFileStream
+    Dim stream As IStream
+    Dim testFolder As String
+    Dim testFolderCreated As Boolean
+    Dim readPath As String
+    Dim emptyPath As String
+    Dim writePath As String
+    Dim appendPath As String
+    Dim createPath As String
+    Dim missingPath As String
+    Dim errorNumber As Long
+    Dim errorSource As String
+    Dim errorDescription As String
+
+    On Error GoTo TestFailure
+    Set fileSystem = CreateObject("Scripting.FileSystemObject")
+    testFolder = fileSystem.BuildPath(fileSystem.GetSpecialFolder(2), _
+                                      "VBAshFileStream_" & fileSystem.GetTempName)
+    fileSystem.CreateFolder testFolder
+    testFolderCreated = True
+    readPath = fileSystem.BuildPath(testFolder, "read.txt")
+    emptyPath = fileSystem.BuildPath(testFolder, "empty.txt")
+    writePath = fileSystem.BuildPath(testFolder, "overwrite.txt")
+    appendPath = fileSystem.BuildPath(testFolder, "append.txt")
+    createPath = fileSystem.BuildPath(testFolder, "created.txt")
+    missingPath = fileSystem.BuildPath(testFolder, "missing.txt")
+
+    Set seedStream = fileSystem.CreateTextFile(readPath, True)
+    seedStream.Write "abcdefg"
+    seedStream.Close
+    Set seedStream = fileSystem.CreateTextFile(emptyPath, True)
+    seedStream.Close
+    Set seedStream = fileSystem.CreateTextFile(writePath, True)
+    seedStream.Write "old contents"
+    seedStream.Close
+    Set seedStream = fileSystem.CreateTextFile(appendPath, True)
+    seedStream.Write "base"
+    seedStream.Close
+
+    Set fileStream = New clsFileStream
+    Set stream = fileStream
+    AssertTrue stream.IsClosed, "new file stream starts closed"
+    AssertTrue Not stream.CanRead And Not stream.CanWrite, _
+               "new file stream has no configured capabilities"
+    AssertTrue Not stream.AtEndOfStream, "closed file stream is not at EOF"
+
+    fileStream.OpenForRead readPath
+    AssertTrue stream.CanRead, "file stream opens for reading"
+    AssertTrue Not stream.CanWrite, "read-only open disables writing"
+    AssertTrue Not stream.IsClosed, "read open marks stream open"
+    AssertTrue Not stream.AtEndOfStream, "nonempty file starts before EOF"
+    AssertEqual "ab", fileStream.ReadText(2), "legacy read returns a bounded first chunk"
+    AssertEqual "cde", stream.ReadText(3), "interface read continues sequentially"
+    AssertTrue Not stream.AtEndOfStream, "partial reads do not report EOF"
+    AssertEqual "fg", stream.ReadText(20), "oversized read returns only remaining content"
+    AssertTrue stream.AtEndOfStream, "reading final characters reaches EOF"
+    AssertEqual "", stream.ReadText(2), "read after EOF returns empty text"
+    AssertTrue stream.AtEndOfStream, "read after EOF keeps EOF true"
+
+    fileStream.CloseStream
+    AssertTrue stream.IsClosed, "close marks file stream closed"
+    AssertTrue stream.CanRead And Not stream.CanWrite, _
+               "close preserves the configured capabilities"
+    AssertTrue Not stream.AtEndOfStream, "closed file stream is not at EOF"
+    fileStream.CloseStream
+    AssertTrue stream.IsClosed, "repeated close is idempotent"
+    AssertTrue Not stream.HasError, "successful repeated close leaves no error"
+
+    fileStream.OpenForRead emptyPath
+    AssertTrue stream.CanRead And Not stream.CanWrite, "empty file opens read-only"
+    AssertTrue stream.AtEndOfStream, "open empty file is at EOF"
+    AssertEqual "", stream.ReadText(10), "reading empty file returns empty text"
+    AssertTrue stream.AtEndOfStream, "empty file remains at EOF after read"
+    fileStream.CloseStream
+
+    fileStream.OpenForRead readPath
+    AssertEqual "", stream.ReadText(0), "zero read limit returns empty text"
+    AssertEqual "", stream.ReadText(-1), "negative read limit returns empty text"
+    AssertEqual "a", stream.ReadText(1), "non-positive reads do not advance the file"
+    fileStream.CloseStream
+
+    fileStream.OpenForWrite createPath, False
+    AssertTrue Not stream.CanRead And stream.CanWrite, "write open configures write-only access"
+    AssertTrue Not stream.AtEndOfStream, "write-only file stream is not at EOF"
+    AssertEqual 3, fileStream.WriteText("one"), "legacy write returns written character count"
+    AssertEqual 3, stream.WriteText("two"), "interface write returns written character count"
+    On Error Resume Next
+    stream.ReadText 1
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo TestFailure
+    AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, _
+                "read on write-only file stream is unsupported"
+    AssertTrue stream.HasError, "unsupported file read records an error"
+    AssertEqual 1, stream.WriteText("!"), "successful write clears the prior error"
+    AssertTrue Not stream.HasError, "successful file write clears error state"
+    fileStream.CloseStream
+    AssertTrue Not stream.CanRead And stream.CanWrite, _
+               "closing a write stream preserves its configured capabilities"
+    AssertEqual "onetwo!", ReadFileStreamTestFile(fileSystem, createPath), _
+                "writes create a file and preserve successive text"
+
+    fileStream.OpenForWrite writePath, False
+    AssertEqual 5, stream.WriteText("fresh"), "overwrite stream accepts new contents"
+    fileStream.CloseStream
+    AssertEqual "fresh", ReadFileStreamTestFile(fileSystem, writePath), _
+                "non-append open overwrites existing content"
+
+    fileStream.OpenForWrite appendPath, True
+    AssertTrue Not stream.CanRead And stream.CanWrite, "append stream is write-only"
+    AssertEqual 3, stream.WriteText("-xy"), "append write reports character count"
+    fileStream.CloseStream
+    AssertEqual "base-xy", ReadFileStreamTestFile(fileSystem, appendPath), _
+                "append open preserves existing content"
+
+    On Error Resume Next
+    fileStream.OpenForRead missingPath
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo TestFailure
+    AssertEqual VBAsh_STREAM_ERROR_OPEN_FAILURE, errorNumber, _
+                "opening a missing file for reading reports open failure"
+    AssertTrue stream.IsClosed, "failed open leaves stream closed"
+    AssertTrue Not stream.CanRead And Not stream.CanWrite, _
+               "failed open does not retain stale capabilities"
+    AssertTrue stream.HasError, "failed open records error state"
+    AssertEqual VBAsh_STREAM_ERROR_OPEN_FAILURE, stream.LastErrorNumber, _
+                "failed open exposes the contract error code"
+    AssertTrue Len(stream.LastErrorDescription) > 0, "failed open exposes a description"
+
+    fileStream.OpenForRead readPath
+    AssertTrue Not stream.HasError, "successful reopen clears a previous open error"
+    On Error Resume Next
+    stream.WriteText "x"
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo TestFailure
+    AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, _
+                "write on read-only file stream is unsupported"
+    AssertTrue stream.HasError, "unsupported file write records an error"
+    AssertEqual "abc", stream.ReadText(3), "successful read clears the prior write error"
+    AssertTrue Not stream.HasError, "successful file read clears error state"
+
+    fileStream.CloseStream
+    On Error Resume Next
+    stream.ReadText 1
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo TestFailure
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, errorNumber, _
+                "read after close raises the closed-stream error"
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, _
+                "read after close records its contract error"
+    AssertTrue Not stream.AtEndOfStream, "EOF query on a closed stream is false"
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, _
+                "closed-stream EOF query does not mask the prior error"
+    On Error Resume Next
+    stream.WriteText "x"
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo TestFailure
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, errorNumber, _
+                "write after close raises the closed-stream error"
+    AssertTrue stream.CanRead And Not stream.CanWrite, _
+               "closed-stream operations preserve read capability"
+    AssertTrue stream.IsClosed, "closed-stream operations preserve closed state"
+    fileStream.CloseStream
+    AssertTrue Not stream.HasError, "successful close clears the prior error"
+
+    fileStream.OpenForRead readPath
+    AssertEqual "abcdefg", stream.ReadText(7), "read limit equal to file size returns all text"
+    AssertTrue stream.AtEndOfStream, "exact-size read reaches EOF"
+    fileStream.CloseStream
+
+    fileStream.OpenForWrite createPath, False
+    AssertTrue Not stream.IsClosed, "a closed instance can be reopened"
+    AssertTrue Not stream.CanRead And stream.CanWrite, _
+               "reopen replaces the previous read capability"
+    AssertEqual 4, stream.WriteText("next"), "reopened instance accepts writes"
+    fileStream.CloseStream
+    AssertEqual "next", ReadFileStreamTestFile(fileSystem, createPath), _
+                "reopen releases the old file and writes to the new stream"
+    GoTo Cleanup
+
+TestFailure:
+    errorNumber = Err.Number
+    errorSource = Err.Source
+    errorDescription = Err.Description
+    Err.Clear
+
+Cleanup:
+    CleanupFileStreamTest fileStream, fileSystem, testFolder, testFolderCreated, _
+                          errorNumber, errorSource, errorDescription
+    If errorNumber <> 0 Then
+        On Error GoTo 0
+        Err.Raise errorNumber, errorSource, errorDescription
+    End If
+End Sub
+
+Private Function ReadFileStreamTestFile(ByVal fileSystem As Object, _
+                                        ByVal path As String) As String
+    Dim textStream As Object
+
+    Set textStream = fileSystem.OpenTextFile(path, 1, False)
+    ReadFileStreamTestFile = textStream.ReadAll
+    textStream.Close
+    Set textStream = Nothing
+End Function
+
+Private Sub CleanupFileStreamTest(ByVal fileStream As clsFileStream, _
+                                  ByVal fileSystem As Object, ByVal folderPath As String, _
+                                  ByVal folderCreated As Boolean, _
+                                  ByRef errorNumber As Long, ByRef errorSource As String, _
+                                  ByRef errorDescription As String)
+    Dim cleanupErrorNumber As Long
+    Dim cleanupErrorDescription As String
+
+    On Error Resume Next
+    If Not fileStream Is Nothing Then fileStream.CloseStream
+    If Err.Number <> 0 Then
+        cleanupErrorNumber = Err.Number
+        cleanupErrorDescription = Err.Description
+        Err.Clear
+    End If
+    If folderCreated Then
+        If Not fileSystem Is Nothing Then
+            If fileSystem.FolderExists(folderPath) Then fileSystem.DeleteFolder folderPath, True
+        End If
+    End If
+    If Err.Number <> 0 And cleanupErrorNumber = 0 Then
+        cleanupErrorNumber = Err.Number
+        cleanupErrorDescription = Err.Description
+        Err.Clear
+    End If
+    On Error GoTo 0
+
+    If errorNumber = 0 And cleanupErrorNumber <> 0 Then
+        errorNumber = cleanupErrorNumber
+        errorSource = "VBAshTests.CleanupFileStreamTest"
+        errorDescription = "Cleanup failed: " & cleanupErrorDescription
+    End If
 End Sub
 
 Private Function ReadRedirectedFile(ByVal fileSystem As Object, ByVal path As String, _

@@ -55,3 +55,19 @@ Os dados abaixo foram informados como resultado de uma execução real no Excel/
 |---|---|---|---:|---|
 | StreamContract | TestStreamContract | PASS | 41 | Resultado informado; não verificado independentemente nesta sessão |
 | MemoryStream | TestMemoryStream | PASS | 112 | Resultado informado; não verificado independentemente nesta sessão |
+
+## Alteração de `clsFileStream` — 2026-11-05
+
+| Campo | Registro |
+|---|---|
+| Data | 2026-11-05 |
+| Branch | `feature/vbash-pipelines` |
+| Commit SHA testado | Não aplicável — alteração ainda não commitada durante esta verificação |
+| Ambiente | Linux/Copilot; Excel/VBA indisponível |
+| Suítes VBA executadas | 0 |
+| Estado de `FileStream` / `TestFileStream` | NOT RUN |
+| Verificações estáticas | PASS: `git diff --check`; 17 grupos registrados e mapeados; leitura em bloco sem concatenação caractere a caractere; escopo de seis arquivos e limites de linha verificados. |
+| Resultado | Implementação e casos de teste adicionados ao código-fonte. A execução, compilação e confirmação de comportamento de `Scripting.FileSystemObject.TextStream` permanecem pendentes no Excel/VBA. |
+| Saída original do executor | Não disponível; nenhuma execução VBA ocorreu |
+
+Este registro não declara aprovação de testes no Excel. As verificações estáticas não substituem compilação nem execução do runtime VBA.
