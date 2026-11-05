@@ -107,6 +107,21 @@ Há uma divergência verificável no número de assertion: a suíte atual conté
 
 Nenhuma correção de código foi necessária nesta auditoria. As verificações estáticas confirmam que `clsFileStream` implementa todos os membros de `IStream`, mantém as cinco assinaturas públicas legadas, as 17 suítes do runner têm dispatch correspondente e a leitura em blocos continua usando `TextStream.Read(maxChars)`. O próximo teste deve ser executado com `VBAshTests.bas` e `clsFileStream.cls` importados do mesmo checkout/commit; se falhar, preservar a linha completa `ERROR | FileStream` com número, descrição e source, além dos dados de existência/tamanho do arquivo e estado do stream incluídos no diagnóstico.
 
+## Auditoria de compilação VBA — 2026-11-05
+
+| Campo | Resultado |
+|---|---|
+| Branch / HEAD de origem | `feature/vbash-pipelines` / `db662eaffd9e5ff77c4ab24fe3bfa395a5e242a7` |
+| Worktree inicial | Limpo; branch alinhada com `origin/feature/vbash-pipelines` |
+| Presença do commit informado | Confirmada como HEAD e ancestral da branch |
+| Compilador VBA / Excel disponível | Não |
+
+O trecho reportado (`Private Sub Class_Initialize(): mIsClosed = True`) ocorre em `clsFileStream.cls:17-19`. A variável está declarada na própria classe em `clsFileStream.cls:13`; ela também está declarada nas outras classes que a utilizam (`clsMemoryStream.cls:14`, `clsNullStream.cls:12`). Portanto, no snapshot `db662ea`, não há identificador `mIsClosed` sem declaração nem renomeação/remoção acidental demonstrável. A falha indica que o componente efetivamente compilado no Excel não corresponde ao texto atual de `clsFileStream.cls`, ou que a mensagem foi associada a outro componente/revisão; isso precisa ser confirmado no VBE inspecionando o nome e o conteúdo do módulo que apresenta o erro. Não se pode atribuir uma causa mais específica sem esse projeto VBA.
+
+Auditoria estática: os cinco módulos de Streams sob revisão e `VBAshTests.bas` têm `Option Explicit`; as tags `@VBAshRevision` ficam em comentário antes de `Option Explicit` e não há declarações `Attribute` nesses arquivos. `IStream` contém dez membros e `clsFileStream`, `clsMemoryStream`, `clsNullStream` e `clsStreamContractProbe` implementam nomes, tipos de retorno e parâmetros correspondentes. `clsFileDescriptorTable` usa os membros `CreateObject("Scripting.Dictionary")`, `Exists` e o item padrão do Dictionary por late binding, não adicionando uma referência de compilação VBA. O runner registra e despacha 17 suítes, conforme `EXPECTED_TEST_COUNT`. Não foram encontrados outros problemas de declaração ou discrepâncias de interface nos módulos inspecionados.
+
+Nenhum fonte foi alterado nesta auditoria: não havia erro comprovado para corrigir, então não houve incremento de revisões. `git diff --check` e as verificações estáticas de declarações de `mIsClosed`, opções, tags, membros de `IStream` e registro/contagem de suítes passaram. Isso não equivale a compilar o projeto. A compilação real, incluindo referências do projeto e os módulos realmente importados, permanece pendente no Excel/VBE. Para a próxima tentativa, reimporte os módulos do commit `db662ea`, execute **Debug > Compile VBAProject** e, se persistir, anote o nome exato do componente, a linha destacada e confirme se o campo privado `mIsClosed As Boolean` consta no módulo compilado.
+
 ## Rastreabilidade de versão — runner `VBAshTests-r1`
 
 Base: `feature/vbash-pipelines` / `2adbc0d796e44877e6c186d10cc94d7289630b73`. Adicionados metadados de revisão (`' @VBAshRevision <módulo>-r1` na linha 1 de `VBAshTests`, `IStream`, `clsFileStream`, `clsMemoryStream`, `clsNullStream`; propriedade `ModuleRevision` nas três classes de stream) e o novo formato de relatório (ver `docs/test-reports/README.md`). Não há alteração funcional nos streams; `TestFileStream` continua com 74 assertions e 17 suítes. Execuções anteriores não foram reatribuídas a versões. Verificações estáticas apenas (`git diff --check`, registro/contagem de suítes, contagem de assertions); **nenhuma execução Excel/VBA**, então o novo relatório está NOT RUN.
