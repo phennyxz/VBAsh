@@ -1,5 +1,11 @@
+' @VBAshRevision clsMemoryStream-r1
 Option Explicit
 Implements IStream
+
+' Identifica a revisão carregada; não altera o comportamento do stream.
+Public Property Get ModuleRevision() As String
+    ModuleRevision = "clsMemoryStream-r1"
+End Property
 
 Private mBuffer As String
 Private mPosition As Long

@@ -1,3 +1,4 @@
+' @VBAshRevision IStream-r1
 Option Explicit
 
 ' LastErrorNumber and LastErrorDescription describe the most recent failed operation.

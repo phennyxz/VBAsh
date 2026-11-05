@@ -1,3 +1,4 @@
+' @VBAshRevision VBAshTests-r1
 Option Explicit
 
 Private mAssertions As Long
@@ -6,6 +7,13 @@ Private mPassedTests As Long
 Private mFailedTests As Long
 Private mErrorTests As Long
 Private mTestResults As Collection
+Private mFailureDetails As Collection
+Private mSuiteStart As Long
+Private mLastAssertNumber As Long
+Private mLastAssertDescription As String
+Private mFailExpected As String
+Private mFailActual As String
+Private Const RUNNER_REVISION As String = "VBAshTests-r1"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
@@ -26,6 +34,7 @@ Public Sub VBAsh_RunTests()
     mFailedTests = 0
     mErrorTests = 0
     Set mTestResults = New Collection
+    Set mFailureDetails = New Collection
     startedAt = Now
 
     RunTest "Tokenizer"
@@ -75,6 +84,11 @@ Private Sub RunTest(ByVal testName As String)
 
     startedAt = Timer
     assertionStart = mAssertions
+    mSuiteStart = mAssertions
+    mLastAssertNumber = 0
+    mLastAssertDescription = ""
+    mFailExpected = ""
+    mFailActual = ""
     On Error GoTo TestError
 
     Select Case testName
@@ -123,16 +137,29 @@ RecordResult:
         Case "ERROR": mErrorTests = mErrorTests + 1
     End Select
 
-    If resultStatus = "PASS" Then
-        mTestResults.Add resultStatus & " | " & testName & _
-                         " | assertions: " & CStr(mAssertions - assertionStart) & _
-                         " | duration: " & Format$(elapsed, "0.000") & " s"
-    Else
-        mTestResults.Add resultStatus & " | " & testName & _
-                         " | error " & CStr(errorNumber) & ": " & errorDescription & _
-                         " | source: " & errorSource & _
-                         " | assertions: " & CStr(mAssertions - assertionStart) & _
-                         " | duration: " & Format$(elapsed, "0.000") & " s"
+    mTestResults.Add resultStatus & " | " & testName & _
+                     " | suite revision: " & RUNNER_REVISION & _
+                     " | assertions executed: " & CStr(mAssertions - assertionStart) & _
+                     " | duration: " & Format$(elapsed, "0.000") & " s"
+
+    If resultStatus = "FAIL" Then
+        mFailureDetails.Add "FAIL | suite: " & testName & _
+                            " | assertion #" & CStr(mLastAssertNumber) & _
+                            " (of " & CStr(mAssertions - assertionStart) & " executed; numbering valid only for " & RUNNER_REVISION & ")" & _
+                            " | description: " & mLastAssertDescription & _
+                            " | expected: [" & mFailExpected & "]" & _
+                            " | actual: [" & mFailActual & "]" & _
+                            " | error " & CStr(errorNumber) & ": " & errorDescription & _
+                            " | source: " & errorSource & _
+                            " | stage: " & mLastAssertDescription
+    ElseIf resultStatus = "ERROR" Then
+        mFailureDetails.Add "ERROR | suite: " & testName & _
+                            " | last assertion passed: #" & CStr(mLastAssertNumber) & _
+                            " (" & mLastAssertDescription & ")" & _
+                            " | error " & CStr(errorNumber) & ": " & errorDescription & _
+                            " | source: " & errorSource & _
+                            " | stage: after assertion #" & CStr(mLastAssertNumber) & _
+                            " (precise stage not recorded)"
     End If
 End Sub
 
@@ -160,16 +187,221 @@ Private Function BuildTestReport(ByVal startedAt As Date, ByVal finishedAt As Da
                                  ByVal summary As String) As String
     Dim result As Variant
     Dim report As String
+    Dim warnings As String
+    Dim moduleReport As String
+    Dim checkoutReport As String
+    Dim unverifiedCount As Long
+    Dim mismatchCount As Long
 
-    report = "VBAsh — relatório de testes" & vbCrLf & _
-             "Início: " & Format$(startedAt, "yyyy-mm-dd hh:nn:ss") & vbCrLf & _
-             "Término: " & Format$(finishedAt, "yyyy-mm-dd hh:nn:ss") & vbCrLf & _
-             summary & vbCrLf & vbCrLf & _
-             "Resultados individuais:" & vbCrLf
+    moduleReport = LoadedModuleReport(warnings, unverifiedCount, mismatchCount)
+    checkoutReport = CheckoutReport(warnings)
+
+    report = "VBAsh TEST REPORT" & vbCrLf & vbCrLf & _
+             "Execution:" & vbCrLf & _
+             "- Date: " & Format$(startedAt, "yyyy-mm-dd") & vbCrLf & _
+             "- Time: " & Format$(startedAt, "hh:nn:ss") & " (end " & _
+                          Format$(finishedAt, "hh:nn:ss") & ")" & vbCrLf & _
+             "- Runner version: " & RUNNER_REVISION & vbCrLf & _
+             "- Workbook: " & WorkbookIdentity() & vbCrLf & vbCrLf & _
+             "Checkout (source tree, NOT proof of loaded modules):" & vbCrLf & _
+             checkoutReport & vbCrLf & _
+             "Loaded module versions (read from the running VBA project):" & vbCrLf & _
+             moduleReport & vbCrLf & _
+             "Results:" & vbCrLf & summary & vbCrLf & vbCrLf & _
+             "Suite details:" & vbCrLf
     For Each result In mTestResults
-        report = report & CStr(result) & vbCrLf
+        report = report & "- " & CStr(result) & vbCrLf
     Next result
+
+    report = report & vbCrLf & "Failure details:" & vbCrLf
+    If mFailureDetails.Count = 0 Then
+        report = report & "- none" & vbCrLf
+    Else
+        For Each result In mFailureDetails
+            report = report & "- " & CStr(result) & vbCrLf
+        Next result
+    End If
+
+    report = report & vbCrLf & "Execution integrity:" & vbCrLf & _
+             "- Checkout/module correspondence: UNVERIFIED (the runner never assumes the " & _
+             "Git checkout equals the modules loaded in Excel; compare revisions manually)" & vbCrLf
+    If mismatchCount > 0 Then
+        report = report & "- Version identification status: MISMATCH (" & CStr(mismatchCount) & _
+                 " module(s) report conflicting revisions)" & vbCrLf
+    ElseIf unverifiedCount > 0 Then
+        report = report & "- Version identification status: PARTIAL (" & CStr(unverifiedCount) & _
+                 " module revision(s) UNVERIFIED)" & vbCrLf
+    Else
+        report = report & "- Version identification status: IDENTIFIED (revision tags read from loaded modules)" & vbCrLf
+    End If
+    If Len(warnings) = 0 Then
+        report = report & "- Warnings: none" & vbCrLf
+    Else
+        report = report & "- Warnings:" & vbCrLf & warnings
+    End If
     BuildTestReport = report
+End Function
+
+Private Function WorkbookIdentity() As String
+    On Error Resume Next
+    WorkbookIdentity = ThisWorkbook.FullName
+    If Err.Number <> 0 Or Len(WorkbookIdentity) = 0 Then WorkbookIdentity = "UNKNOWN"
+End Function
+
+' Reads .git/HEAD above the workbook folder, if present. This describes the
+' checkout on disk only; it says nothing about the modules loaded in Excel.
+Private Function CheckoutReport(ByRef warnings As String) As String
+    Dim fileSystem As Object
+    Dim folder As String
+    Dim head As String
+    Dim branch As String
+    Dim sha As String
+    Dim gitDir As String
+    Dim depth As Long
+
+    branch = "UNKNOWN"
+    sha = "UNKNOWN"
+    On Error GoTo Unavailable
+    Set fileSystem = CreateObject("Scripting.FileSystemObject")
+    folder = ThisWorkbook.Path
+    Do While Len(folder) > 0 And depth < 6
+        If fileSystem.FolderExists(folder & "\.git") Then
+            gitDir = folder & "\.git"
+            Exit Do
+        End If
+        If fileSystem.GetParentFolderName(folder) = folder Then Exit Do
+        folder = fileSystem.GetParentFolderName(folder)
+        depth = depth + 1
+    Loop
+    If Len(gitDir) = 0 Then GoTo Unavailable
+
+    head = Trim$(ReadSmallTextFile(fileSystem, gitDir & "\HEAD"))
+    If Left$(head, 5) = "ref: " Then
+        branch = Mid$(head, 6)
+        If Left$(branch, 11) = "refs/heads/" Then branch = Mid$(branch, 12)
+        sha = ResolveGitRef(fileSystem, gitDir, Mid$(head, 6))
+    ElseIf Len(head) = 40 Then
+        branch = "DETACHED"
+        sha = head
+    End If
+    CheckoutReport = "- Branch: " & branch & vbCrLf & _
+                     "- Commit: " & sha & vbCrLf & _
+                     "- Checkout status: UNKNOWN (working-tree cleanliness is not detectable from VBA)" & vbCrLf & _
+                     "- Source: " & gitDir & " (read-only, UNVERIFIED relation to loaded modules)" & vbCrLf
+    Exit Function
+
+Unavailable:
+    CheckoutReport = "- Branch: UNKNOWN" & vbCrLf & "- Commit: UNKNOWN" & vbCrLf & _
+                     "- Checkout status: UNKNOWN" & vbCrLf & _
+                     "- Source: no .git folder found near the workbook" & vbCrLf
+    warnings = warnings & "  * Checkout identity unavailable; record the commit manually." & vbCrLf
+End Function
+
+Private Function ReadSmallTextFile(ByVal fileSystem As Object, ByVal path As String) As String
+    Dim stream As Object
+    If Not fileSystem.FileExists(path) Then Exit Function
+    Set stream = fileSystem.OpenTextFile(path, 1)
+    If Not stream.AtEndOfStream Then ReadSmallTextFile = stream.ReadAll
+    stream.Close
+End Function
+
+Private Function ResolveGitRef(ByVal fileSystem As Object, ByVal gitDir As String, _
+                               ByVal refName As String) As String
+    Dim text As String
+    Dim lines As Variant
+    Dim line As Variant
+
+    text = Trim$(ReadSmallTextFile(fileSystem, gitDir & "\" & Replace(refName, "/", "\")))
+    If Len(text) = 40 Then
+        ResolveGitRef = text
+        Exit Function
+    End If
+    text = ReadSmallTextFile(fileSystem, gitDir & "\packed-refs")
+    lines = Split(Replace(text, vbCr, ""), vbLf)
+    For Each line In lines
+        If Len(line) > 41 And Right$(line, Len(refName)) = refName Then
+            ResolveGitRef = Left$(line, 40)
+            Exit Function
+        End If
+    Next line
+    ResolveGitRef = "UNKNOWN"
+End Function
+
+Private Function LoadedModuleReport(ByRef warnings As String, ByRef unverifiedCount As Long, _
+                                    ByRef mismatchCount As Long) As String
+    Dim names As Variant
+    Dim index As Long
+    Dim tag As String
+    Dim prop As String
+    Dim line As String
+    Dim note As String
+
+    names = Array("VBAshTests", "IStream", "clsFileStream", "clsMemoryStream", "clsNullStream")
+    For index = LBound(names) To UBound(names)
+        tag = ReadModuleTag(CStr(names(index)))
+        prop = ReadModuleProperty(CStr(names(index)))
+        note = ""
+        If Len(prop) = 0 Then
+            line = tag
+        ElseIf tag = "UNVERIFIED" Then
+            line = prop
+            note = " [instance property only; code tag UNVERIFIED]"
+        ElseIf tag = prop Then
+            line = tag
+            note = " [code tag and instance property agree]"
+        Else
+            line = "MISMATCH tag=" & tag & " property=" & prop
+            mismatchCount = mismatchCount + 1
+            warnings = warnings & "  * " & CStr(names(index)) & ": tag and property differ." & vbCrLf
+        End If
+        If line = "UNVERIFIED" Then
+            unverifiedCount = unverifiedCount + 1
+            warnings = warnings & "  * " & CStr(names(index)) & ": revision UNVERIFIED " & _
+                       "(enable Trust access to the VBA project object model, or module lacks tag)." & vbCrLf
+        End If
+        LoadedModuleReport = LoadedModuleReport & "- " & CStr(names(index)) & ": " & line & note & vbCrLf
+    Next index
+End Function
+
+' Reads the "' @VBAshRevision <id>" tag from the loaded code module via VBIDE.
+Private Function ReadModuleTag(ByVal moduleName As String) As String
+    Dim codeModule As Object
+    Dim lineIndex As Long
+    Dim text As String
+    Dim marker As String
+
+    marker = "@VBAshRevision "
+    ReadModuleTag = "UNVERIFIED"
+    On Error GoTo Done
+    Set codeModule = ThisWorkbook.VBProject.VBComponents(moduleName).CodeModule
+    For lineIndex = 1 To IIf(codeModule.CountOfLines < 10, codeModule.CountOfLines, 10)
+        text = codeModule.Lines(lineIndex, 1)
+        If InStr(text, marker) > 0 Then
+            ReadModuleTag = Trim$(Mid$(text, InStr(text, marker) + Len(marker)))
+            Exit Function
+        End If
+    Next lineIndex
+Done:
+End Function
+
+' Reads ModuleRevision from a live instance; IStream and VBAshTests have none.
+Private Function ReadModuleProperty(ByVal moduleName As String) As String
+    On Error GoTo Done
+    Select Case moduleName
+        Case "clsFileStream"
+            Dim fileStream As clsFileStream
+            Set fileStream = New clsFileStream
+            ReadModuleProperty = fileStream.ModuleRevision
+        Case "clsMemoryStream"
+            Dim memoryStream As clsMemoryStream
+            Set memoryStream = New clsMemoryStream
+            ReadModuleProperty = memoryStream.ModuleRevision
+        Case "clsNullStream"
+            Dim nullStream As clsNullStream
+            Set nullStream = New clsNullStream
+            ReadModuleProperty = nullStream.ModuleRevision
+    End Select
+Done:
 End Function
 
 Private Function SaveTestReport(ByVal reportText As String, ByRef reportPath As String, _
@@ -1835,7 +2067,11 @@ End Function
 
 Private Sub AssertEqual(ByVal expected As Variant, ByVal actual As Variant, ByVal description As String)
     mAssertions = mAssertions + 1
+    mLastAssertNumber = mAssertions - mSuiteStart
+    mLastAssertDescription = description
     If CStr(expected) <> CStr(actual) Then
+        mFailExpected = CStr(expected)
+        mFailActual = CStr(actual)
         Err.Raise ASSERT_EQUAL_ERROR, "VBAshTests", _
             description & ": expected [" & CStr(expected) & "], got [" & CStr(actual) & "]"
     End If
@@ -1843,5 +2079,11 @@ End Sub
 
 Private Sub AssertTrue(ByVal condition As Boolean, ByVal description As String)
     mAssertions = mAssertions + 1
-    If Not condition Then Err.Raise ASSERT_TRUE_ERROR, "VBAshTests", description
+    mLastAssertNumber = mAssertions - mSuiteStart
+    mLastAssertDescription = description
+    If Not condition Then
+        mFailExpected = "True"
+        mFailActual = "False"
+        Err.Raise ASSERT_TRUE_ERROR, "VBAshTests", description
+    End If
 End Sub

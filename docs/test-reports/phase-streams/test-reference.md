@@ -25,3 +25,7 @@ As linhas `STR-GAP-*` indicam somente que não foi possível localizar testes co
 
 - `IMPLEMENTATION_PLAN.md`, Fase 3 — Streams, critérios de conclusão e testes mínimos.
 - `docs/test-reports/phase-streams/execution-log.md` — status atual das evidências de execução.
+
+## Identificação de versão
+
+Todo relatório gerado pelo runner identifica o checkout (quando disponível), as revisões dos módulos carregados e inclui detalhes de falha com número da assertion por suíte. Numeração de assertions só é comparável dentro da mesma revisão de `VBAshTests` (`VBAshTests-r1`). Detalhes em `docs/test-reports/README.md`.
