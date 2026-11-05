@@ -71,3 +71,23 @@ Os dados abaixo foram informados como resultado de uma execução real no Excel/
 | Saída original do executor | Não disponível; nenhuma execução VBA ocorreu |
 
 Este registro não declara aprovação de testes no Excel. As verificações estáticas não substituem compilação nem execução do runtime VBA.
+
+## Relatório Excel informado — 2026-11-05
+
+Os números a seguir foram fornecidos pelo usuário a partir de uma execução Excel/VBA; o workbook, os módulos VBA efetivamente carregados e a saída original não estão disponíveis nesta sessão para confirmação independente.
+
+| Campo | Resultado informado |
+|---|---|
+| Suítes | 17 |
+| PASS / FAIL / ERROR | 15 / 1 / 1 |
+| Asserções | 620 |
+| `NullStream` | FAIL: expectativa da escrita multiline era 11; o valor correto é 10 (`5 + 2 + 3`). |
+| `FileStream` | ERROR `-2147220303` (`VBAsh_STREAM_ERROR_CLOSED`), atribuído à verificação externa do arquivo após reabrir, escrever e fechar a instância. |
+
+### Investigação e alterações neste snapshot
+
+- Corrigida somente a expectativa numérica do teste `NullStream`; `clsNullStream` permaneceu inalterada.
+- Na fonte atual, o erro 1201 é lançado por `clsFileStream` somente pelos guards de leitura/escrita quando `mIsClosed` é verdadeiro. A função `ReadFileStreamTestFile` usa um `TextStream` independente do `FileSystemObject` e não chama métodos da instância `clsFileStream`; portanto, a origem reportada não é reproduzível pelo fluxo estático da fonte atual. Não há evidência suficiente para atribuir a causa ao stream, ao helper ou a uma divergência dos módulos carregados no Excel.
+- Ampliada `TestFileStream` para validar escrita→reabertura para leitura e leitura→reabertura para escrita, capacidades, arquivo/tamanho após close e persistência. A verificação externa agora informa etapa, número/descrição/origem do erro, existência/tamanho do arquivo e estado da instância se falhar.
+- Essas alterações adicionam oito assertions à fonte de teste em relação ao caso reportado. Nenhuma execução ou compilação Excel/VBA foi feita nesta sessão; o status desses casos permanece NOT RUN, e o diagnóstico final do 1201 depende de uma nova execução da suíte atualizada.
+- Verificações estáticas desta revisão: `git diff --check` passou; a expectativa `NullStream` é 10; as 17 suítes do runner estão registradas e mapeadas; foram confirmadas oito assertions adicionais em `TestFileStream`; `clsFileStream.cls` e os demais módulos fora de teste/documentação não foram alterados.

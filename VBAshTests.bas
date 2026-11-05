@@ -1419,7 +1419,7 @@ Private Sub TestNullStream()
 
     AssertEqual 0, stream.WriteText(""), "empty write returns zero"
     AssertEqual 1, stream.WriteText("a"), "one-char write returns one"
-    AssertEqual 11, stream.WriteText("hello" & vbCrLf & "abc"), "multi-line write counts all characters"
+    AssertEqual 10, stream.WriteText("hello" & vbCrLf & "abc"), "multi-line write counts all characters"
     AssertEqual 100000, stream.WriteText(String$(100000, "x")), "large write returns full length"
     AssertEqual "", stream.ReadText(100), "written content is not stored"
     AssertTrue stream.AtEndOfStream, "write does not change EOF"
@@ -1484,6 +1484,7 @@ End Sub
 
 Private Sub TestFileStream()
     Dim fileSystem As Object
+    Dim testFile As Object
     Dim seedStream As Object
     Dim fileStream As clsFileStream
     Dim stream As IStream
@@ -1584,20 +1585,32 @@ Private Sub TestFileStream()
     fileStream.CloseStream
     AssertTrue Not stream.CanRead And stream.CanWrite, _
                "closing a write stream preserves its configured capabilities"
-    AssertEqual "onetwo!", ReadFileStreamTestFile(fileSystem, createPath), _
+    AssertTrue stream.IsClosed, "write stream is closed before external file verification"
+    AssertTrue fileSystem.FileExists(createPath), "closed write stream leaves the file available externally"
+    Set testFile = fileSystem.GetFile(createPath)
+    AssertEqual 7, CDbl(testFile.Size), "closed write stream persists all written characters"
+    Set testFile = Nothing
+    AssertEqual "onetwo!", ReadFileStreamTestFile(fileSystem, createPath, stream), _
                 "writes create a file and preserve successive text"
+
+    fileStream.OpenForRead createPath
+    AssertTrue stream.CanRead And Not stream.CanWrite, _
+               "reopening a written file for reading replaces capabilities"
+    AssertEqual "onetwo!", stream.ReadText(20), _
+                "reopened read stream sees content persisted by the prior close"
+    fileStream.CloseStream
 
     fileStream.OpenForWrite writePath, False
     AssertEqual 5, stream.WriteText("fresh"), "overwrite stream accepts new contents"
     fileStream.CloseStream
-    AssertEqual "fresh", ReadFileStreamTestFile(fileSystem, writePath), _
+    AssertEqual "fresh", ReadFileStreamTestFile(fileSystem, writePath, stream), _
                 "non-append open overwrites existing content"
 
     fileStream.OpenForWrite appendPath, True
     AssertTrue Not stream.CanRead And stream.CanWrite, "append stream is write-only"
     AssertEqual 3, stream.WriteText("-xy"), "append write reports character count"
     fileStream.CloseStream
-    AssertEqual "base-xy", ReadFileStreamTestFile(fileSystem, appendPath), _
+    AssertEqual "base-xy", ReadFileStreamTestFile(fileSystem, appendPath, stream), _
                 "append open preserves existing content"
 
     On Error Resume Next
@@ -1665,7 +1678,12 @@ Private Sub TestFileStream()
                "reopen replaces the previous read capability"
     AssertEqual 4, stream.WriteText("next"), "reopened instance accepts writes"
     fileStream.CloseStream
-    AssertEqual "next", ReadFileStreamTestFile(fileSystem, createPath), _
+    AssertTrue stream.IsClosed, "reopened write stream is closed before external verification"
+    AssertTrue fileSystem.FileExists(createPath), "reopened write leaves the file available externally"
+    Set testFile = fileSystem.GetFile(createPath)
+    AssertEqual 4, CDbl(testFile.Size), "reopened write persists the replacement content"
+    Set testFile = Nothing
+    AssertEqual "next", ReadFileStreamTestFile(fileSystem, createPath, stream), _
                 "reopen releases the old file and writes to the new stream"
     GoTo Cleanup
 
@@ -1684,14 +1702,50 @@ Cleanup:
     End If
 End Sub
 
-Private Function ReadFileStreamTestFile(ByVal fileSystem As Object, _
-                                        ByVal path As String) As String
+Private Function ReadFileStreamTestFile(ByVal fileSystem As Object, ByVal path As String, _
+                                        ByVal stream As IStream) As String
     Dim textStream As Object
+    Dim file As Object
+    Dim stage As String
+    Dim fileExists As Boolean
+    Dim fileSize As Double
+    Dim originalErrorNumber As Long
+    Dim originalErrorSource As String
+    Dim originalErrorDescription As String
 
+    On Error GoTo ReadFailure
+    stage = "check file existence"
+    fileExists = fileSystem.FileExists(path)
+    If fileExists Then
+        stage = "get file size"
+        Set file = fileSystem.GetFile(path)
+        fileSize = CDbl(file.Size)
+        Set file = Nothing
+    End If
+    stage = "open independent FileSystemObject TextStream"
     Set textStream = fileSystem.OpenTextFile(path, 1, False)
+    stage = "read independent FileSystemObject TextStream"
     ReadFileStreamTestFile = textStream.ReadAll
+    stage = "close independent FileSystemObject TextStream"
     textStream.Close
     Set textStream = Nothing
+    Exit Function
+
+ReadFailure:
+    originalErrorNumber = Err.Number
+    originalErrorSource = Err.Source
+    originalErrorDescription = Err.Description
+    On Error GoTo 0
+    Err.Raise originalErrorNumber, originalErrorSource, _
+        "ReadFileStreamTestFile failed during " & stage & _
+        " (error " & CStr(originalErrorNumber) & ": " & originalErrorDescription & _
+        "; source: " & originalErrorSource & "; path: " & path & _
+        "; exists: " & CStr(fileExists) & "; size: " & CStr(fileSize) & _
+        " bytes; IStream closed: " & CStr(stream.IsClosed) & _
+        "; CanRead: " & CStr(stream.CanRead) & _
+        "; CanWrite: " & CStr(stream.CanWrite) & _
+        "; HasError: " & CStr(stream.HasError) & _
+        "; LastErrorNumber: " & CStr(stream.LastErrorNumber) & ")"
 End Function
 
 Private Sub CleanupFileStreamTest(ByVal fileStream As clsFileStream, _
