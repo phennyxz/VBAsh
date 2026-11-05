@@ -149,3 +149,30 @@ Verificações estáticas: fluxo de dados do valor residual até `Err.Raise`, pr
 ## Rastreabilidade de versão — runner `VBAshTests-r1`
 
 Base: `feature/vbash-pipelines` / `2adbc0d796e44877e6c186d10cc94d7289630b73`. Adicionados metadados de revisão (`' @VBAshRevision <módulo>-r1` na linha 1 de `VBAshTests`, `IStream`, `clsFileStream`, `clsMemoryStream`, `clsNullStream`; propriedade `ModuleRevision` nas três classes de stream) e o novo formato de relatório (ver `docs/test-reports/README.md`). Não há alteração funcional nos streams; `TestFileStream` continua com 74 assertions e 17 suítes. Execuções anteriores não foram reatribuídas a versões. Verificações estáticas apenas (`git diff --check`, registro/contagem de suítes, contagem de assertions); **nenhuma execução Excel/VBA**, então o novo relatório está NOT RUN.
+
+## Execução Excel informada — 2026-11-05, 16:31:20
+
+Resultado real informado pelo usuário, executado no Excel com `VBAshTests-r3`. Esta execução não foi reproduzida nem verificada independentemente nesta sessão. O relatório do runner não conseguiu identificar o checkout Git associado ao workbook; portanto, não se atribui branch ou SHA a estes resultados e a correspondência entre checkout e módulos carregados é `UNVERIFIED`.
+
+| Campo | Resultado informado |
+|---|---|
+| Data/hora | 2026-11-05 16:31:20 (fuso não informado) |
+| Ambiente | Excel/VBA; versão do Excel e sistema operacional não informados |
+| Suítes | 17 |
+| PASS / FAIL / ERROR | 17 / 0 / 0 |
+| Assertions | 656 |
+| Branch / commit do checkout | `UNKNOWN` |
+| Checkout/módulos carregados | `UNVERIFIED` |
+| Runner | `VBAshTests-r3` |
+| Módulos identificados como carregados | `VBAshTests-r3`, `IStream-r1`, `clsFileStream-r2`, `clsMemoryStream-r2`, `clsNullStream-r2` |
+
+### Resultados individuais conhecidos
+
+| Suíte | Estado informado | Assertions |
+|---|---|---:|
+| FileStream | PASS | 74 |
+| NullStream | PASS | 42 |
+| Redirection | PASS | 74 |
+| Demais 14 suítes | PASS | Contagens individuais não fornecidas |
+
+O usuário informou que todas as demais suítes passaram. Nenhuma saída original do executor foi anexada a este registro. O resultado é uma execução real relatada pelo usuário, não uma verificação independente dos arquivos deste checkout; os históricos de execuções anteriores permanecem inalterados.

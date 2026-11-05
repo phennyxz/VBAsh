@@ -9,7 +9,7 @@ Use `phase-<slug>` para o diretório de cada fase, com o slug baseado no nome ad
 | Fase | Referência | Execução | Estado |
 |---|---|---|---|
 | Pipelines | `phase-pipelines/test-reference.md` | `phase-pipelines/execution-log.md` | Aguardando registro formal |
-| Streams | `phase-streams/test-reference.md` | `phase-streams/execution-log.md` | Pendente |
+| Streams | `phase-streams/test-reference.md` | `phase-streams/execution-log.md` | Execução informada (17/17 PASS); fase ainda incompleta devido às lacunas abertas |
 
 Uma fase só deve ser declarada aprovada quando houver evidência de execução e rastreabilidade suficientes. Um relato fornecido por uma pessoa deve ser identificado como tal, sem apresentá-lo como execução verificada independentemente.
 

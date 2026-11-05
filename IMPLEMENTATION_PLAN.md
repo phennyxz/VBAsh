@@ -133,6 +133,7 @@ Implementar a camada de entrada/saída que representa stdin, stdout e stderr, al
 - Falhas de abertura, leitura, escrita e fechamento são mapeadas aos códigos disponíveis em `IStream`; operações incompatíveis ou após fechamento usam os erros de contrato.
 - `TestFileStream` cobre os modos, leitura, escrita, EOF, erros e lifecycle com arquivos temporários e limpeza após falhas. Os casos de regressão também cobrem transições da mesma instância escrita→leitura e leitura→escrita, overwrite após reabertura e leitura externa somente depois de fechar.
 - `TestNullStream` espera 10 caracteres para `"hello" & vbCrLf & "abc"` (5 + 2 + 3).
+- Execução Excel/VBA de `VBAshTests-r3` informada pelo usuário em 2026-11-05: 17/17 suítes PASS, 656 assertions; `FileStream` (74), `NullStream` (42) e `Redirection` (74) PASS. O checkout Git não foi identificado pelo relatório e a correspondência com os módulos carregados permanece UNVERIFIED; detalhes em `docs/test-reports/phase-streams/execution-log.md`.
 
 Esta entrega completa apenas o stream de arquivo isolado. A tabela de descritores, stdin/stdout/stderr do host, redirecionamento de entrada e conexão do executor com streams continuam pendentes de integração futura; os critérios gerais acima não devem ser considerados concluídos.
 
