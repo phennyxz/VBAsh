@@ -91,3 +91,18 @@ Os números a seguir foram fornecidos pelo usuário a partir de uma execução E
 - Ampliada `TestFileStream` para validar escrita→reabertura para leitura e leitura→reabertura para escrita, capacidades, arquivo/tamanho após close e persistência. A verificação externa agora informa etapa, número/descrição/origem do erro, existência/tamanho do arquivo e estado da instância se falhar.
 - Essas alterações adicionam oito assertions à fonte de teste em relação ao caso reportado. Nenhuma execução ou compilação Excel/VBA foi feita nesta sessão; o status desses casos permanece NOT RUN, e o diagnóstico final do 1201 depende de uma nova execução da suíte atualizada.
 - Verificações estáticas desta revisão: `git diff --check` passou; a expectativa `NullStream` é 10; as 17 suítes do runner estão registradas e mapeadas; foram confirmadas oito assertions adicionais em `TestFileStream`; `clsFileStream.cls` e os demais módulos fora de teste/documentação não foram alterados.
+
+## Auditoria de continuidade — 2026-11-05
+
+| Campo | Resultado |
+|---|---|
+| Branch / HEAD de origem | `feature/vbash-pipelines` / `25bb9cd3b5e4e985d6ab7ef3d986d6ce2c246b8d` |
+| Worktree inicial | Limpo; branch alinhada com `origin/feature/vbash-pipelines` |
+| Presença do commit informado | Confirmada como HEAD e ancestral da branch |
+| Execução Excel/VBA nesta sessão | Não executada |
+
+O erro 1201 reportado não é reproduzível apenas pela fonte disponível: `ReadFileStreamTestFile` abre um `TextStream` independente e só consulta propriedades de leitura da interface em seu caminho de diagnóstico; os únicos `Err.Raise VBAsh_STREAM_ERROR_CLOSED` em `clsFileStream` são os guards das operações públicas de leitura/escrita, que o helper não invoca. A sequência atual fecha o objeto COM anterior em `CloseStream`, define a referência como `Nothing`, cria e atribui o objeto novo em `OpenForWrite`, escreve e fecha antes da leitura externa. Não foi encontrado defeito comprovado em `clsFileStream`, e a classe/contrato não foram alterados.
+
+Há uma divergência verificável no número de assertion: a suíte atual contém 74 assertions; a #66 atual é “read limit equal to file size returns all text” e a verificação final de `"next"` é a #74. O relato anterior chamou a verificação final de #66, portanto foi produzido com uma revisão anterior de `VBAshTests.bas` (antes das oito assertions adicionadas pelo commit `25bb9cd`). Isso comprova que o relatório citado não usa a numeração do teste presente no HEAD atual, mas não identifica quais módulos estavam carregados no Excel nem a origem do 1201. A expectativa NullStream de 10 e as oito assertions de regressão/diagnóstico estão presentes no HEAD.
+
+Nenhuma correção de código foi necessária nesta auditoria. As verificações estáticas confirmam que `clsFileStream` implementa todos os membros de `IStream`, mantém as cinco assinaturas públicas legadas, as 17 suítes do runner têm dispatch correspondente e a leitura em blocos continua usando `TextStream.Read(maxChars)`. O próximo teste deve ser executado com `VBAshTests.bas` e `clsFileStream.cls` importados do mesmo checkout/commit; se falhar, preservar a linha completa `ERROR | FileStream` com número, descrição e source, além dos dados de existência/tamanho do arquivo e estado do stream incluídos no diagnóstico.
