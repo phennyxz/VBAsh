@@ -1,11 +1,6 @@
-' @VBAshRevision clsFileStream-r1
+' @VBAshRevision clsFileStream-r2
 Option Explicit
 Implements IStream
-
-' Identifica a revisão carregada; não altera o comportamento do stream.
-Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsFileStream-r1"
-End Property
 
 Private mTextStream As Object
 Private mCanRead As Boolean
@@ -13,6 +8,11 @@ Private mCanWrite As Boolean
 Private mIsClosed As Boolean
 Private mLastErrorNumber As Long
 Private mLastErrorDescription As String
+
+' Identifica a revisão carregada; não altera o comportamento do stream.
+Public Property Get ModuleRevision() As String
+    ModuleRevision = "clsFileStream-r2"
+End Property
 
 Private Sub Class_Initialize()
     mIsClosed = True

@@ -1,17 +1,17 @@
-' @VBAshRevision clsNullStream-r1
+' @VBAshRevision clsNullStream-r2
 Option Explicit
 Implements IStream
-
-' Identifica a revisão carregada; não altera o comportamento do stream.
-Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsNullStream-r1"
-End Property
 
 Private mCanRead As Boolean
 Private mCanWrite As Boolean
 Private mIsClosed As Boolean
 Private mLastErrorNumber As Long
 Private mLastErrorDescription As String
+
+' Identifica a revisão carregada; não altera o comportamento do stream.
+Public Property Get ModuleRevision() As String
+    ModuleRevision = "clsNullStream-r2"
+End Property
 
 Private Sub Class_Initialize()
     Initialize
