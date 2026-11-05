@@ -1,4 +1,4 @@
-' @VBAshRevision VBAshTests-r3
+' @VBAshRevision VBAshTests-r4
 Option Explicit
 
 Private mAssertions As Long
@@ -13,11 +13,11 @@ Private mLastAssertNumber As Long
 Private mLastAssertDescription As String
 Private mFailExpected As String
 Private mFailActual As String
-Private Const RUNNER_REVISION As String = "VBAshTests-r3"
+Private Const RUNNER_REVISION As String = "VBAshTests-r4"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
-Private Const EXPECTED_TEST_COUNT As Long = 17
+Private Const EXPECTED_TEST_COUNT As Long = 18
 
 Public Sub VBAsh_RunTests()
     Dim startedAt As Date
@@ -54,6 +54,7 @@ Public Sub VBAsh_RunTests()
     RunTest "MemoryStream"
     RunTest "NullStream"
     RunTest "FileStream"
+    RunTest "FileDescriptorTable"
 
     finishedAt = Now
     summary = TestRunSummary()
@@ -109,6 +110,7 @@ Private Sub RunTest(ByVal testName As String)
         Case "MemoryStream": TestMemoryStream
         Case "NullStream": TestNullStream
         Case "FileStream": TestFileStream
+        Case "FileDescriptorTable": TestFileDescriptorTable
         Case Else
             Err.Raise vbObjectError + 1102, "VBAshTests.RunTest", _
                       "Teste não registrado: " & testName
@@ -336,7 +338,8 @@ Private Function LoadedModuleReport(ByRef warnings As String, ByRef unverifiedCo
     Dim line As String
     Dim note As String
 
-    names = Array("VBAshTests", "IStream", "clsFileStream", "clsMemoryStream", "clsNullStream")
+    names = Array("VBAshTests", "IStream", "clsFileStream", "clsMemoryStream", _
+                  "clsNullStream", "clsFileDescriptorTable")
     For index = LBound(names) To UBound(names)
         tag = ReadModuleTag(CStr(names(index)))
         prop = ReadModuleProperty(CStr(names(index)))
@@ -400,6 +403,10 @@ Private Function ReadModuleProperty(ByVal moduleName As String) As String
             Dim nullStream As clsNullStream
             Set nullStream = New clsNullStream
             ReadModuleProperty = nullStream.ModuleRevision
+        Case "clsFileDescriptorTable"
+            Dim descriptorTable As clsFileDescriptorTable
+            Set descriptorTable = New clsFileDescriptorTable
+            ReadModuleProperty = descriptorTable.ModuleRevision
     End Select
 Done:
 End Function
@@ -1444,6 +1451,254 @@ Private Sub TestStreamContract()
     AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, _
                 "closed-stream error has its distinct code"
 End Sub
+
+Private Sub TestFileDescriptorTable()
+    Dim table As clsFileDescriptorTable
+    Dim ownedDefaults As clsFileDescriptorTable
+    Dim stdinStream As clsMemoryStream
+    Dim stdoutStream As clsMemoryStream
+    Dim stderrStream As clsMemoryStream
+    Dim ownedStream As clsMemoryStream
+    Dim replacementStream As clsMemoryStream
+    Dim anotherStream As clsMemoryStream
+    Dim probe As clsStreamContractProbe
+    Dim unassignedStream As IStream
+    Dim stream As IStream
+    Dim streamAlias As IStream
+    Dim errorNumber As Long
+    Dim errorSource As String
+    Dim errorDescription As String
+
+    Set table = New clsFileDescriptorTable
+    On Error Resume Next
+    table.HasDescriptor 0
+    errorNumber = Err.Number
+    errorSource = Err.Source
+    errorDescription = Err.Description
+    Err.Clear
+    On Error GoTo 0
+    AssertTrue errorNumber <> 0, "table operations require explicit standard-stream initialization"
+    AssertEqual "clsFileDescriptorTable.HasDescriptor", errorSource, _
+                "uninitialized table error identifies the operation"
+
+    Set stdinStream = New clsMemoryStream
+    stdinStream.Initialize "stdin", True, False
+    Set stdoutStream = New clsMemoryStream
+    stdoutStream.Initialize "", False, True
+    Set stderrStream = New clsMemoryStream
+    stderrStream.Initialize "", False, True
+    table.Initialize stdinStream, stdoutStream, stderrStream
+
+    AssertTrue table.HasDescriptor(0), "initialization associates stdin with descriptor zero"
+    AssertTrue table.HasDescriptor(1), "initialization associates stdout with descriptor one"
+    AssertTrue table.HasDescriptor(2), "initialization associates stderr with descriptor two"
+    Set stream = table.GetDescriptor(0)
+    AssertTrue stream Is stdinStream, "descriptor zero returns the supplied stdin object"
+    AssertTrue stream.CanRead And Not stream.CanWrite, "stdin capabilities are preserved"
+    Set stream = table.GetDescriptor(1)
+    AssertTrue stream Is stdoutStream, "descriptor one returns the supplied stdout object"
+    AssertTrue Not stream.CanRead And stream.CanWrite, "stdout capabilities are preserved"
+    Set stream = table.GetDescriptor(2)
+    AssertTrue stream Is stderrStream, "descriptor two returns the supplied stderr object"
+    AssertTrue Not stream.IsClosed, "standard streams are borrowed and open by default"
+    AssertEqual 3, table.FindFreeDescriptor(), "first free descriptor starts at three"
+
+    AssertTrue Not table.HasDescriptor(3), "unassigned descriptor is absent"
+    On Error Resume Next
+    Set stream = table.GetDescriptor(3)
+    errorNumber = Err.Number
+    errorSource = Err.Source
+    errorDescription = Err.Description
+    Err.Clear
+    On Error GoTo 0
+    AssertTrue errorNumber <> 0, "retrieving an absent descriptor raises an error"
+    AssertEqual "clsFileDescriptorTable.GetDescriptor", errorSource, _
+                "absent-descriptor error identifies the operation"
+    AssertTrue InStr(1, errorDescription, "does not exist", vbTextCompare) > 0, _
+               "absent-descriptor error explains the missing association"
+
+    Set ownedStream = New clsMemoryStream
+    ownedStream.Initialize "", False, True
+    table.SetDescriptor 5, ownedStream
+    table.SetDescriptor 4, ownedStream
+    AssertEqual 3, table.FindFreeDescriptor(), "free descriptor search finds the lowest hole"
+    table.SetDescriptor 3, stdoutStream
+    AssertEqual 6, table.FindFreeDescriptor(), "free descriptor search skips occupied numbers"
+
+    table.DuplicateDescriptor 3, 6
+    Set stream = table.GetDescriptor(3)
+    Set streamAlias = table.GetDescriptor(6)
+    AssertTrue stream Is streamAlias, "duplicate descriptors preserve object identity"
+    AssertTrue streamAlias Is stdoutStream, "duplicate points at the original stream object"
+    AssertEqual 4, streamAlias.WriteText("same"), "write through duplicate reaches the shared stream"
+    AssertEqual "same", stdoutStream.Contents, "shared stream contains duplicate write"
+    table.CloseDescriptor 3
+    AssertTrue Not DescriptorStreamIsClosed(stdoutStream), _
+               "closing one borrowed alias does not close its stream"
+    AssertTrue table.HasDescriptor(6), "closing one alias leaves the other descriptor present"
+    Set stream = table.GetDescriptor(6)
+    AssertEqual 1, stream.WriteText("!"), "remaining alias stays functional"
+    AssertEqual "same!", stdoutStream.Contents, "remaining alias writes to the same destination"
+    table.CloseDescriptor 6
+    AssertTrue Not DescriptorStreamIsClosed(stdoutStream), _
+               "closing the last borrowed alias does not close the stream"
+
+    Set ownedStream = New clsMemoryStream
+    ownedStream.Initialize "", False, True
+    table.SetDescriptor 7, ownedStream, True
+    table.DuplicateDescriptor 7, 8
+    Set stream = table.GetDescriptor(8)
+    AssertTrue stream Is ownedStream, "owned duplicate shares the owned object"
+    table.CloseDescriptor 7
+    AssertTrue Not DescriptorStreamIsClosed(ownedStream), _
+               "owned stream stays open while a duplicate refers to it"
+    table.CloseDescriptor 8
+    AssertTrue DescriptorStreamIsClosed(ownedStream), "last owned descriptor closes the stream"
+    AssertTrue Not table.HasDescriptor(8), "successful final close removes the descriptor"
+
+    Set ownedStream = New clsMemoryStream
+    ownedStream.Initialize "", False, True
+    Set replacementStream = New clsMemoryStream
+    replacementStream.Initialize "", False, True
+    table.SetDescriptor 9, ownedStream, True
+    table.SetDescriptor 10, ownedStream, False
+    table.SetDescriptor 9, replacementStream, False
+    AssertTrue Not DescriptorStreamIsClosed(ownedStream), _
+               "replacing one alias does not close an owned stream still referenced elsewhere"
+    table.CloseDescriptor 10
+    AssertTrue DescriptorStreamIsClosed(ownedStream), _
+               "ownership persists after a later borrowed association and owner alias replacement"
+    Set stream = table.GetDescriptor(9)
+    AssertTrue stream Is replacementStream, "replacement associates the new stream"
+
+    Set ownedStream = New clsMemoryStream
+    ownedStream.Initialize "", False, True
+    Set anotherStream = New clsMemoryStream
+    anotherStream.Initialize "", False, True
+    table.SetDescriptor 11, ownedStream, True
+    table.SetDescriptor 11, anotherStream, False
+    AssertTrue DescriptorStreamIsClosed(ownedStream), _
+               "replacing the last owned descriptor closes its old stream"
+    Set stream = table.GetDescriptor(11)
+    AssertTrue stream Is anotherStream, "occupied descriptor now returns the replacement object"
+    AssertTrue Not DescriptorStreamIsClosed(anotherStream), "borrowed replacement remains open"
+
+    Set unassignedStream = Nothing
+    On Error Resume Next
+    table.SetDescriptor 11, unassignedStream, True
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertTrue errorNumber <> 0, "associating Nothing is rejected"
+    Set stream = table.GetDescriptor(11)
+    AssertTrue stream Is anotherStream, "invalid replacement preserves the previous association"
+    AssertTrue Not DescriptorStreamIsClosed(anotherStream), _
+               "invalid replacement leaves the old stream usable"
+
+    On Error Resume Next
+    table.SetDescriptor -1, anotherStream
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertTrue errorNumber <> 0, "negative descriptors are rejected"
+    AssertTrue table.HasDescriptor(11), "invalid descriptor operation preserves valid associations"
+
+    On Error Resume Next
+    table.DuplicateDescriptor 99, 12
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertTrue errorNumber <> 0, "duplicating an absent source descriptor is rejected"
+    AssertTrue Not table.HasDescriptor(12), "failed duplication does not create its destination"
+
+    Set replacementStream = New clsMemoryStream
+    replacementStream.Initialize "closed", True, False
+    replacementStream.CloseStream
+    table.SetDescriptor 13, replacementStream
+    AssertTrue table.HasDescriptor(13), "a descriptor can reference an already closed stream"
+    Set stream = table.GetDescriptor(13)
+    AssertTrue stream Is replacementStream And stream.IsClosed, _
+               "existing closed stream is distinguishable from an absent descriptor"
+    table.CloseDescriptor 13
+    AssertTrue DescriptorStreamIsClosed(replacementStream), _
+               "closing borrowed closed-stream association does not change it"
+
+    Set probe = New clsStreamContractProbe
+    probe.ConfigureCloseFailure True
+    table.SetDescriptor 14, probe, True
+    On Error Resume Next
+    table.CloseDescriptor 14
+    errorNumber = Err.Number
+    errorSource = Err.Source
+    errorDescription = Err.Description
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual vbObjectError + 1260, errorNumber, _
+                "failed owned close preserves the original error number"
+    AssertEqual "clsFileDescriptorTable.CloseDescriptor", errorSource, _
+                "failed owned close identifies the table operation"
+    AssertTrue InStr(1, errorDescription, "Configured close failure", vbTextCompare) > 0, _
+               "failed owned close preserves the original error description"
+    AssertTrue table.HasDescriptor(14), "failed final close preserves the descriptor association"
+    Set stream = table.GetDescriptor(14)
+    AssertTrue stream Is probe And Not stream.IsClosed, _
+               "failed close retains the original open stream"
+    AssertEqual 1, probe.CloseCount, "first close failure attempts the stream exactly once"
+
+    probe.ConfigureCloseFailure False
+    table.CloseDescriptor 14
+    AssertTrue Not table.HasDescriptor(14), "retry after close failure removes the descriptor"
+    AssertTrue DescriptorStreamIsClosed(probe), "successful retry closes the owned stream"
+    AssertEqual 2, probe.CloseCount, "retry invokes CloseStream again"
+
+    Set probe = New clsStreamContractProbe
+    probe.ConfigureCloseFailure True
+    table.SetDescriptor 15, probe, True
+    On Error Resume Next
+    table.SetDescriptor 15, anotherStream
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual vbObjectError + 1260, errorNumber, _
+                "failed owned close prevents descriptor replacement"
+    Set stream = table.GetDescriptor(15)
+    AssertTrue stream Is probe And Not stream.IsClosed, _
+               "failed replacement preserves the previous descriptor mapping"
+    AssertTrue Not DescriptorStreamIsClosed(anotherStream), _
+               "failed replacement leaves the incoming stream untouched"
+    probe.ConfigureCloseFailure False
+    table.SetDescriptor 15, anotherStream
+    Set stream = table.GetDescriptor(15)
+    AssertTrue stream Is anotherStream And DescriptorStreamIsClosed(probe), _
+               "replacement succeeds after the old stream can be closed"
+    table.CloseDescriptor 15
+
+    Set stdinStream = New clsMemoryStream
+    stdinStream.Initialize "", True, False
+    Set stdoutStream = New clsMemoryStream
+    stdoutStream.Initialize "", False, True
+    Set stderrStream = New clsMemoryStream
+    stderrStream.Initialize "", False, True
+    Set ownedDefaults = New clsFileDescriptorTable
+    ownedDefaults.Initialize stdinStream, stdoutStream, stderrStream, True
+    ownedDefaults.CloseDescriptor 0
+    AssertTrue DescriptorStreamIsClosed(stdinStream), _
+               "explicit standard-stream ownership closes the final owned descriptor"
+    AssertTrue Not DescriptorStreamIsClosed(stdoutStream), _
+               "closing owned stdin does not close another standard stream"
+    ownedDefaults.CloseDescriptor 1
+    ownedDefaults.CloseDescriptor 2
+
+    Set table = Nothing
+    Set ownedDefaults = Nothing
+End Sub
+
+Private Function DescriptorStreamIsClosed(ByVal streamObject As Object) As Boolean
+    Dim stream As IStream
+
+    Set stream = streamObject
+    DescriptorStreamIsClosed = stream.IsClosed
+End Function
 
 Private Sub TestMemoryStream()
     Dim memory As clsMemoryStream

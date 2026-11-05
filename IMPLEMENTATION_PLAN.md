@@ -134,8 +134,9 @@ Implementar a camada de entrada/saída que representa stdin, stdout e stderr, al
 - `TestFileStream` cobre os modos, leitura, escrita, EOF, erros e lifecycle com arquivos temporários e limpeza após falhas. Os casos de regressão também cobrem transições da mesma instância escrita→leitura e leitura→escrita, overwrite após reabertura e leitura externa somente depois de fechar.
 - `TestNullStream` espera 10 caracteres para `"hello" & vbCrLf & "abc"` (5 + 2 + 3).
 - Execução Excel/VBA de `VBAshTests-r3` informada pelo usuário em 2026-11-05: 17/17 suítes PASS, 656 assertions; `FileStream` (74), `NullStream` (42) e `Redirection` (74) PASS. O checkout Git não foi identificado pelo relatório e a correspondência com os módulos carregados permanece UNVERIFIED; detalhes em `docs/test-reports/phase-streams/execution-log.md`.
+- `clsFileDescriptorTable` administra associações `FD -> IStream` após inicialização explícita dos FDs 0/1/2 com objetos fornecidos pelo host. Implementa consulta, associação, duplicação, fechamento e busca do menor FD livre; ownership é rastreado por identidade do stream e fechamento final com falha preserva a associação para retry. A suíte `TestFileDescriptorTable` foi adicionada, mas ainda não executada no Excel/VBA. Esta implementação isolada não conecta a tabela a `clsSession`, executor ou redirecionamentos.
 
-Esta entrega completa apenas o stream de arquivo isolado. A tabela de descritores, stdin/stdout/stderr do host, redirecionamento de entrada e conexão do executor com streams continuam pendentes de integração futura; os critérios gerais acima não devem ser considerados concluídos.
+Esta entrega completa apenas os streams isolados e a tabela de descritores isolada. A atribuição dos streams do host em tempo de execução, stdin/stdout/stderr da sessão, redirecionamento de entrada e conexão do executor com a tabela continuam pendentes de integração futura; os critérios gerais acima não devem ser considerados concluídos.
 
 ---
 

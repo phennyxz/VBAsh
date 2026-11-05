@@ -176,3 +176,18 @@ Resultado real informado pelo usuário, executado no Excel com `VBAshTests-r3`. 
 | Demais 14 suítes | PASS | Contagens individuais não fornecidas |
 
 O usuário informou que todas as demais suítes passaram. Nenhuma saída original do executor foi anexada a este registro. O resultado é uma execução real relatada pelo usuário, não uma verificação independente dos arquivos deste checkout; os históricos de execuções anteriores permanecem inalterados.
+
+## Implementação isolada de `clsFileDescriptorTable` — 2026-11-06
+
+| Campo | Resultado |
+|---|---|
+| Branch / base | `feature/descriptor-table`, baseada em `main` no commit `d9dde542db555e68191cf65a518a9f00c7d1a458` |
+| Execução Excel/VBA | Não executada; Excel/VBA não está disponível neste ambiente |
+| Suítes / assertions executadas nesta sessão | 0 / 0 |
+| Estado de `TestFileDescriptorTable` | Adicionada ao runner como a 18ª suíte; NOT RUN |
+| Implementação | A tabela agora inicializa explicitamente FD 0/1/2 com `IStream` fornecidos, consulta/associa/duplica/fecha descritores e encontra o menor FD livre desde 3. Duplicatas preservam identidade de objeto; ownership é por identidade e permanece ativo enquanto houver descritor associado. Streams emprestados não são fechados pela tabela. |
+| Erros e substituição | Números negativos, descritores ausentes, operações antes de inicializar e associação a `Nothing` são rejeitados. Associação inválida mantém o mapeamento anterior. Fechamento final de stream próprio ocorre antes de remover o FD; se falhar, o erro original é propagado com contexto e a associação fica disponível para retry. |
+| Testes adicionados | Inicialização padrão, capacidades/identidade, consulta, busca de FD livre, aliasing e escrita compartilhada, fechamento de referência emprestada/própria, substituição, validação, stream previamente fechado e retry após falha de `CloseStream`. |
+| Verificações estáticas | PASS: `git diff --check`; auditoria estrutural de 35 módulos VBA; tags e propriedades de revisão consistentes quando presentes; 18 suítes registradas, despachadas e esperadas; 62 assertions presentes no fonte da nova suíte. Nenhuma compilação VBA é alegada. |
+
+A tabela não cria streams padrão implicitamente e ainda não está integrada a `clsSession`, executor, redirecionamentos ou pipes. Os resultados históricos de execução não foram alterados; em particular, o relatório informado de `VBAshTests-r3` não valida esta nova suíte.

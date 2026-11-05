@@ -8,6 +8,8 @@ Private mCanWrite As Boolean
 Private mIsClosed As Boolean
 Private mLastErrorNumber As Long
 Private mLastErrorDescription As String
+Private mFailClose As Boolean
+Private mCloseCount As Long
 
 Private Sub Class_Initialize()
     mPosition = 1
@@ -19,6 +21,14 @@ Public Sub ConfigureCapabilities(ByVal canRead As Boolean, ByVal canWrite As Boo
     mCanRead = canRead
     mCanWrite = canWrite
 End Sub
+
+Public Sub ConfigureCloseFailure(ByVal shouldFail As Boolean)
+    mFailClose = shouldFail
+End Sub
+
+Public Property Get CloseCount() As Long
+    CloseCount = mCloseCount
+End Property
 
 Private Property Get IStream_CanRead() As Boolean
     IStream_CanRead = mCanRead
@@ -80,6 +90,11 @@ Private Function IStream_WriteText(ByVal text As String) As Long
 End Function
 
 Private Sub IStream_CloseStream()
+    mCloseCount = mCloseCount + 1
+    If mFailClose Then
+        Err.Raise vbObjectError + 1260, "clsStreamContractProbe.CloseStream", _
+                  "Configured close failure."
+    End If
     mIsClosed = True
     ClearStreamError
 End Sub
