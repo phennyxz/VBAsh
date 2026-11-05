@@ -1,4 +1,4 @@
-' @VBAshRevision VBAshTests-r1
+' @VBAshRevision VBAshTests-r2
 Option Explicit
 
 Private mAssertions As Long
@@ -13,7 +13,7 @@ Private mLastAssertNumber As Long
 Private mLastAssertDescription As String
 Private mFailExpected As String
 Private mFailActual As String
-Private Const RUNNER_REVISION As String = "VBAshTests-r1"
+Private Const RUNNER_REVISION As String = "VBAshTests-r2"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
@@ -189,12 +189,12 @@ Private Function BuildTestReport(ByVal startedAt As Date, ByVal finishedAt As Da
     Dim report As String
     Dim warnings As String
     Dim moduleReport As String
-    Dim checkoutReport As String
+    Dim checkoutText As String
     Dim unverifiedCount As Long
     Dim mismatchCount As Long
 
     moduleReport = LoadedModuleReport(warnings, unverifiedCount, mismatchCount)
-    checkoutReport = CheckoutReport(warnings)
+    checkoutText = CheckoutReport(warnings)
 
     report = "VBAsh TEST REPORT" & vbCrLf & vbCrLf & _
              "Execution:" & vbCrLf & _
@@ -204,7 +204,7 @@ Private Function BuildTestReport(ByVal startedAt As Date, ByVal finishedAt As Da
              "- Runner version: " & RUNNER_REVISION & vbCrLf & _
              "- Workbook: " & WorkbookIdentity() & vbCrLf & vbCrLf & _
              "Checkout (source tree, NOT proof of loaded modules):" & vbCrLf & _
-             checkoutReport & vbCrLf & _
+             checkoutText & vbCrLf & _
              "Loaded module versions (read from the running VBA project):" & vbCrLf & _
              moduleReport & vbCrLf & _
              "Results:" & vbCrLf & summary & vbCrLf & vbCrLf & _
