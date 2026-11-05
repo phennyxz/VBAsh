@@ -1,3 +1,4 @@
+' @VBAshRevision VBAshTests-r3
 Option Explicit
 
 Private mAssertions As Long
@@ -6,10 +7,17 @@ Private mPassedTests As Long
 Private mFailedTests As Long
 Private mErrorTests As Long
 Private mTestResults As Collection
+Private mFailureDetails As Collection
+Private mSuiteStart As Long
+Private mLastAssertNumber As Long
+Private mLastAssertDescription As String
+Private mFailExpected As String
+Private mFailActual As String
+Private Const RUNNER_REVISION As String = "VBAshTests-r3"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
-Private Const EXPECTED_TEST_COUNT As Long = 15
+Private Const EXPECTED_TEST_COUNT As Long = 17
 
 Public Sub VBAsh_RunTests()
     Dim startedAt As Date
@@ -26,6 +34,7 @@ Public Sub VBAsh_RunTests()
     mFailedTests = 0
     mErrorTests = 0
     Set mTestResults = New Collection
+    Set mFailureDetails = New Collection
     startedAt = Now
 
     RunTest "Tokenizer"
@@ -43,6 +52,8 @@ Public Sub VBAsh_RunTests()
     RunTest "Redirection"
     RunTest "StreamContract"
     RunTest "MemoryStream"
+    RunTest "NullStream"
+    RunTest "FileStream"
 
     finishedAt = Now
     summary = TestRunSummary()
@@ -73,6 +84,11 @@ Private Sub RunTest(ByVal testName As String)
 
     startedAt = Timer
     assertionStart = mAssertions
+    mSuiteStart = mAssertions
+    mLastAssertNumber = 0
+    mLastAssertDescription = ""
+    mFailExpected = ""
+    mFailActual = ""
     On Error GoTo TestError
 
     Select Case testName
@@ -91,6 +107,8 @@ Private Sub RunTest(ByVal testName As String)
         Case "Redirection": TestRedirection
         Case "StreamContract": TestStreamContract
         Case "MemoryStream": TestMemoryStream
+        Case "NullStream": TestNullStream
+        Case "FileStream": TestFileStream
         Case Else
             Err.Raise vbObjectError + 1102, "VBAshTests.RunTest", _
                       "Teste não registrado: " & testName
@@ -119,16 +137,29 @@ RecordResult:
         Case "ERROR": mErrorTests = mErrorTests + 1
     End Select
 
-    If resultStatus = "PASS" Then
-        mTestResults.Add resultStatus & " | " & testName & _
-                         " | assertions: " & CStr(mAssertions - assertionStart) & _
-                         " | duration: " & Format$(elapsed, "0.000") & " s"
-    Else
-        mTestResults.Add resultStatus & " | " & testName & _
-                         " | error " & CStr(errorNumber) & ": " & errorDescription & _
-                         " | source: " & errorSource & _
-                         " | assertions: " & CStr(mAssertions - assertionStart) & _
-                         " | duration: " & Format$(elapsed, "0.000") & " s"
+    mTestResults.Add resultStatus & " | " & testName & _
+                     " | suite revision: " & RUNNER_REVISION & _
+                     " | assertions executed: " & CStr(mAssertions - assertionStart) & _
+                     " | duration: " & Format$(elapsed, "0.000") & " s"
+
+    If resultStatus = "FAIL" Then
+        mFailureDetails.Add "FAIL | suite: " & testName & _
+                            " | assertion #" & CStr(mLastAssertNumber) & _
+                            " (of " & CStr(mAssertions - assertionStart) & " executed; numbering valid only for " & RUNNER_REVISION & ")" & _
+                            " | description: " & mLastAssertDescription & _
+                            " | expected: [" & mFailExpected & "]" & _
+                            " | actual: [" & mFailActual & "]" & _
+                            " | error " & CStr(errorNumber) & ": " & errorDescription & _
+                            " | source: " & errorSource & _
+                            " | stage: " & mLastAssertDescription
+    ElseIf resultStatus = "ERROR" Then
+        mFailureDetails.Add "ERROR | suite: " & testName & _
+                            " | last assertion passed: #" & CStr(mLastAssertNumber) & _
+                            " (" & mLastAssertDescription & ")" & _
+                            " | error " & CStr(errorNumber) & ": " & errorDescription & _
+                            " | source: " & errorSource & _
+                            " | stage: after assertion #" & CStr(mLastAssertNumber) & _
+                            " (precise stage not recorded)"
     End If
 End Sub
 
@@ -156,16 +187,221 @@ Private Function BuildTestReport(ByVal startedAt As Date, ByVal finishedAt As Da
                                  ByVal summary As String) As String
     Dim result As Variant
     Dim report As String
+    Dim warnings As String
+    Dim moduleReport As String
+    Dim checkoutText As String
+    Dim unverifiedCount As Long
+    Dim mismatchCount As Long
 
-    report = "VBAsh — relatório de testes" & vbCrLf & _
-             "Início: " & Format$(startedAt, "yyyy-mm-dd hh:nn:ss") & vbCrLf & _
-             "Término: " & Format$(finishedAt, "yyyy-mm-dd hh:nn:ss") & vbCrLf & _
-             summary & vbCrLf & vbCrLf & _
-             "Resultados individuais:" & vbCrLf
+    moduleReport = LoadedModuleReport(warnings, unverifiedCount, mismatchCount)
+    checkoutText = CheckoutReport(warnings)
+
+    report = "VBAsh TEST REPORT" & vbCrLf & vbCrLf & _
+             "Execution:" & vbCrLf & _
+             "- Date: " & Format$(startedAt, "yyyy-mm-dd") & vbCrLf & _
+             "- Time: " & Format$(startedAt, "hh:nn:ss") & " (end " & _
+                          Format$(finishedAt, "hh:nn:ss") & ")" & vbCrLf & _
+             "- Runner version: " & RUNNER_REVISION & vbCrLf & _
+             "- Workbook: " & WorkbookIdentity() & vbCrLf & vbCrLf & _
+             "Checkout (source tree, NOT proof of loaded modules):" & vbCrLf & _
+             checkoutText & vbCrLf & _
+             "Loaded module versions (read from the running VBA project):" & vbCrLf & _
+             moduleReport & vbCrLf & _
+             "Results:" & vbCrLf & summary & vbCrLf & vbCrLf & _
+             "Suite details:" & vbCrLf
     For Each result In mTestResults
-        report = report & CStr(result) & vbCrLf
+        report = report & "- " & CStr(result) & vbCrLf
     Next result
+
+    report = report & vbCrLf & "Failure details:" & vbCrLf
+    If mFailureDetails.Count = 0 Then
+        report = report & "- none" & vbCrLf
+    Else
+        For Each result In mFailureDetails
+            report = report & "- " & CStr(result) & vbCrLf
+        Next result
+    End If
+
+    report = report & vbCrLf & "Execution integrity:" & vbCrLf & _
+             "- Checkout/module correspondence: UNVERIFIED (the runner never assumes the " & _
+             "Git checkout equals the modules loaded in Excel; compare revisions manually)" & vbCrLf
+    If mismatchCount > 0 Then
+        report = report & "- Version identification status: MISMATCH (" & CStr(mismatchCount) & _
+                 " module(s) report conflicting revisions)" & vbCrLf
+    ElseIf unverifiedCount > 0 Then
+        report = report & "- Version identification status: PARTIAL (" & CStr(unverifiedCount) & _
+                 " module revision(s) UNVERIFIED)" & vbCrLf
+    Else
+        report = report & "- Version identification status: IDENTIFIED (revision tags read from loaded modules)" & vbCrLf
+    End If
+    If Len(warnings) = 0 Then
+        report = report & "- Warnings: none" & vbCrLf
+    Else
+        report = report & "- Warnings:" & vbCrLf & warnings
+    End If
     BuildTestReport = report
+End Function
+
+Private Function WorkbookIdentity() As String
+    On Error Resume Next
+    WorkbookIdentity = ThisWorkbook.FullName
+    If Err.Number <> 0 Or Len(WorkbookIdentity) = 0 Then WorkbookIdentity = "UNKNOWN"
+End Function
+
+' Reads .git/HEAD above the workbook folder, if present. This describes the
+' checkout on disk only; it says nothing about the modules loaded in Excel.
+Private Function CheckoutReport(ByRef warnings As String) As String
+    Dim fileSystem As Object
+    Dim folder As String
+    Dim head As String
+    Dim branch As String
+    Dim sha As String
+    Dim gitDir As String
+    Dim depth As Long
+
+    branch = "UNKNOWN"
+    sha = "UNKNOWN"
+    On Error GoTo Unavailable
+    Set fileSystem = CreateObject("Scripting.FileSystemObject")
+    folder = ThisWorkbook.Path
+    Do While Len(folder) > 0 And depth < 6
+        If fileSystem.FolderExists(folder & "\.git") Then
+            gitDir = folder & "\.git"
+            Exit Do
+        End If
+        If fileSystem.GetParentFolderName(folder) = folder Then Exit Do
+        folder = fileSystem.GetParentFolderName(folder)
+        depth = depth + 1
+    Loop
+    If Len(gitDir) = 0 Then GoTo Unavailable
+
+    head = Trim$(ReadSmallTextFile(fileSystem, gitDir & "\HEAD"))
+    If Left$(head, 5) = "ref: " Then
+        branch = Mid$(head, 6)
+        If Left$(branch, 11) = "refs/heads/" Then branch = Mid$(branch, 12)
+        sha = ResolveGitRef(fileSystem, gitDir, Mid$(head, 6))
+    ElseIf Len(head) = 40 Then
+        branch = "DETACHED"
+        sha = head
+    End If
+    CheckoutReport = "- Branch: " & branch & vbCrLf & _
+                     "- Commit: " & sha & vbCrLf & _
+                     "- Checkout status: UNKNOWN (working-tree cleanliness is not detectable from VBA)" & vbCrLf & _
+                     "- Source: " & gitDir & " (read-only, UNVERIFIED relation to loaded modules)" & vbCrLf
+    Exit Function
+
+Unavailable:
+    CheckoutReport = "- Branch: UNKNOWN" & vbCrLf & "- Commit: UNKNOWN" & vbCrLf & _
+                     "- Checkout status: UNKNOWN" & vbCrLf & _
+                     "- Source: no .git folder found near the workbook" & vbCrLf
+    warnings = warnings & "  * Checkout identity unavailable; record the commit manually." & vbCrLf
+End Function
+
+Private Function ReadSmallTextFile(ByVal fileSystem As Object, ByVal path As String) As String
+    Dim stream As Object
+    If Not fileSystem.FileExists(path) Then Exit Function
+    Set stream = fileSystem.OpenTextFile(path, 1)
+    If Not stream.AtEndOfStream Then ReadSmallTextFile = stream.ReadAll
+    stream.Close
+End Function
+
+Private Function ResolveGitRef(ByVal fileSystem As Object, ByVal gitDir As String, _
+                               ByVal refName As String) As String
+    Dim text As String
+    Dim lines As Variant
+    Dim line As Variant
+
+    text = Trim$(ReadSmallTextFile(fileSystem, gitDir & "\" & Replace(refName, "/", "\")))
+    If Len(text) = 40 Then
+        ResolveGitRef = text
+        Exit Function
+    End If
+    text = ReadSmallTextFile(fileSystem, gitDir & "\packed-refs")
+    lines = Split(Replace(text, vbCr, ""), vbLf)
+    For Each line In lines
+        If Len(line) > 41 And Right$(line, Len(refName)) = refName Then
+            ResolveGitRef = Left$(line, 40)
+            Exit Function
+        End If
+    Next line
+    ResolveGitRef = "UNKNOWN"
+End Function
+
+Private Function LoadedModuleReport(ByRef warnings As String, ByRef unverifiedCount As Long, _
+                                    ByRef mismatchCount As Long) As String
+    Dim names As Variant
+    Dim index As Long
+    Dim tag As String
+    Dim prop As String
+    Dim line As String
+    Dim note As String
+
+    names = Array("VBAshTests", "IStream", "clsFileStream", "clsMemoryStream", "clsNullStream")
+    For index = LBound(names) To UBound(names)
+        tag = ReadModuleTag(CStr(names(index)))
+        prop = ReadModuleProperty(CStr(names(index)))
+        note = ""
+        If Len(prop) = 0 Then
+            line = tag
+        ElseIf tag = "UNVERIFIED" Then
+            line = prop
+            note = " [instance property only; code tag UNVERIFIED]"
+        ElseIf tag = prop Then
+            line = tag
+            note = " [code tag and instance property agree]"
+        Else
+            line = "MISMATCH tag=" & tag & " property=" & prop
+            mismatchCount = mismatchCount + 1
+            warnings = warnings & "  * " & CStr(names(index)) & ": tag and property differ." & vbCrLf
+        End If
+        If line = "UNVERIFIED" Then
+            unverifiedCount = unverifiedCount + 1
+            warnings = warnings & "  * " & CStr(names(index)) & ": revision UNVERIFIED " & _
+                       "(enable Trust access to the VBA project object model, or module lacks tag)." & vbCrLf
+        End If
+        LoadedModuleReport = LoadedModuleReport & "- " & CStr(names(index)) & ": " & line & note & vbCrLf
+    Next index
+End Function
+
+' Reads the "' @VBAshRevision <id>" tag from the loaded code module via VBIDE.
+Private Function ReadModuleTag(ByVal moduleName As String) As String
+    Dim codeModule As Object
+    Dim lineIndex As Long
+    Dim text As String
+    Dim marker As String
+
+    marker = "@VBAshRevision "
+    ReadModuleTag = "UNVERIFIED"
+    On Error GoTo Done
+    Set codeModule = ThisWorkbook.VBProject.VBComponents(moduleName).CodeModule
+    For lineIndex = 1 To IIf(codeModule.CountOfLines < 10, codeModule.CountOfLines, 10)
+        text = codeModule.Lines(lineIndex, 1)
+        If InStr(text, marker) > 0 Then
+            ReadModuleTag = Trim$(Mid$(text, InStr(text, marker) + Len(marker)))
+            Exit Function
+        End If
+    Next lineIndex
+Done:
+End Function
+
+' Reads ModuleRevision from a live instance; IStream and VBAshTests have none.
+Private Function ReadModuleProperty(ByVal moduleName As String) As String
+    On Error GoTo Done
+    Select Case moduleName
+        Case "clsFileStream"
+            Dim fileStream As clsFileStream
+            Set fileStream = New clsFileStream
+            ReadModuleProperty = fileStream.ModuleRevision
+        Case "clsMemoryStream"
+            Dim memoryStream As clsMemoryStream
+            Set memoryStream = New clsMemoryStream
+            ReadModuleProperty = memoryStream.ModuleRevision
+        Case "clsNullStream"
+            Dim nullStream As clsNullStream
+            Set nullStream = New clsNullStream
+            ReadModuleProperty = nullStream.ModuleRevision
+    End Select
+Done:
 End Function
 
 Private Function SaveTestReport(ByVal reportText As String, ByRef reportPath As String, _
@@ -1393,6 +1629,504 @@ Private Sub TestMemoryStream()
     AssertTrue Not stream.CanWrite, "unsupported write preserves disabled-stream write capability"
 End Sub
 
+Private Sub TestNullStream()
+    Dim nullStream As clsNullStream
+    Dim stream As IStream
+    Dim errorNumber As Long
+
+    Set nullStream = New clsNullStream
+    Set stream = nullStream
+    AssertTrue stream.CanRead, "null stream is readable by default"
+    AssertTrue stream.CanWrite, "null stream is writable by default"
+    AssertTrue Not stream.IsClosed, "null stream starts open"
+    AssertTrue Not stream.HasError, "null stream starts without error"
+    AssertEqual 0, stream.LastErrorNumber, "initial error number is zero"
+    AssertEqual "", stream.LastErrorDescription, "initial error description is empty"
+    AssertTrue stream.AtEndOfStream, "open null stream is at EOF"
+
+    AssertEqual "", stream.ReadText(10), "read returns empty text"
+    AssertEqual "", stream.ReadText(0), "zero-limit read returns empty text"
+    AssertEqual "", stream.ReadText(-1), "negative-limit read returns empty text"
+    AssertTrue stream.AtEndOfStream, "read keeps EOF"
+
+    AssertEqual 0, stream.WriteText(""), "empty write returns zero"
+    AssertEqual 1, stream.WriteText("a"), "one-char write returns one"
+    AssertEqual 10, stream.WriteText("hello" & vbCrLf & "abc"), "multi-line write counts all characters"
+    AssertEqual 100000, stream.WriteText(String$(100000, "x")), "large write returns full length"
+    AssertEqual "", stream.ReadText(100), "written content is not stored"
+    AssertTrue stream.AtEndOfStream, "write does not change EOF"
+    AssertTrue Not stream.HasError, "successful operations leave no error"
+
+    stream.CloseStream
+    AssertTrue stream.IsClosed, "close marks null stream closed"
+    AssertTrue stream.CanRead, "close keeps read capability"
+    AssertTrue stream.CanWrite, "close keeps write capability"
+    AssertTrue Not stream.AtEndOfStream, "closed null stream is not at EOF"
+    AssertTrue Not stream.HasError, "close leaves no error"
+    stream.CloseStream
+    AssertTrue stream.IsClosed, "repeated close keeps stream closed"
+    AssertTrue Not stream.HasError, "repeated close leaves no error"
+
+    On Error Resume Next
+    stream.ReadText 1
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, errorNumber, "read after close raises closed error"
+    AssertTrue stream.HasError, "read after close records error"
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, "read after close exposes code"
+    AssertTrue Len(stream.LastErrorDescription) > 0, "read after close exposes description"
+
+    On Error Resume Next
+    stream.WriteText "x"
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, errorNumber, "write after close raises closed error"
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, "write after close exposes code"
+    stream.CloseStream
+    AssertTrue Not stream.HasError, "close clears prior error"
+
+    nullStream.Initialize
+    AssertTrue Not stream.IsClosed, "Initialize reopens the stream"
+    AssertEqual 3, stream.WriteText("abc"), "write works after reinitialize"
+
+    nullStream.Initialize True, False
+    AssertTrue stream.CanRead And Not stream.CanWrite, "read-only configuration"
+    On Error Resume Next
+    stream.WriteText "x"
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, "write on non-writable raises unsupported"
+    AssertEqual "", stream.ReadText(1), "successful read after failure"
+    AssertTrue Not stream.HasError, "successful read clears prior error"
+
+    nullStream.Initialize False, True
+    AssertTrue Not stream.AtEndOfStream, "non-readable null stream is not at EOF"
+    On Error Resume Next
+    stream.ReadText 1
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, "read on non-readable raises unsupported"
+    AssertEqual 2, stream.WriteText("ok"), "successful write after failure"
+    AssertTrue Not stream.HasError, "successful write clears prior error"
+End Sub
+
+Private Sub TestFileStream()
+    Dim fileSystem As Object
+    Dim testFile As Object
+    Dim seedStream As Object
+    Dim fileStream As clsFileStream
+    Dim stream As IStream
+    Dim testFolder As String
+    Dim testFolderCreated As Boolean
+    Dim readPath As String
+    Dim emptyPath As String
+    Dim writePath As String
+    Dim appendPath As String
+    Dim createPath As String
+    Dim missingPath As String
+    Dim errorNumber As Long
+    Dim errorSource As String
+    Dim errorDescription As String
+    Dim testFailed As Boolean
+    Dim failureStage As String
+    Dim stageTrace As String
+
+    On Error GoTo TestFailure
+    Set fileSystem = CreateObject("Scripting.FileSystemObject")
+    testFolder = fileSystem.BuildPath(fileSystem.GetSpecialFolder(2), _
+                                      "VBAshFileStream_" & fileSystem.GetTempName)
+    fileSystem.CreateFolder testFolder
+    testFolderCreated = True
+    readPath = fileSystem.BuildPath(testFolder, "read.txt")
+    emptyPath = fileSystem.BuildPath(testFolder, "empty.txt")
+    writePath = fileSystem.BuildPath(testFolder, "overwrite.txt")
+    appendPath = fileSystem.BuildPath(testFolder, "append.txt")
+    createPath = fileSystem.BuildPath(testFolder, "created.txt")
+    missingPath = fileSystem.BuildPath(testFolder, "missing.txt")
+
+    Set seedStream = fileSystem.CreateTextFile(readPath, True)
+    seedStream.Write "abcdefg"
+    seedStream.Close
+    Set seedStream = fileSystem.CreateTextFile(emptyPath, True)
+    seedStream.Close
+    Set seedStream = fileSystem.CreateTextFile(writePath, True)
+    seedStream.Write "old contents"
+    seedStream.Close
+    Set seedStream = fileSystem.CreateTextFile(appendPath, True)
+    seedStream.Write "base"
+    seedStream.Close
+
+    Set fileStream = New clsFileStream
+    Set stream = fileStream
+    AssertTrue stream.IsClosed, "new file stream starts closed"
+    AssertTrue Not stream.CanRead And Not stream.CanWrite, _
+               "new file stream has no configured capabilities"
+    AssertTrue Not stream.AtEndOfStream, "closed file stream is not at EOF"
+
+    fileStream.OpenForRead readPath
+    AssertTrue stream.CanRead, "file stream opens for reading"
+    AssertTrue Not stream.CanWrite, "read-only open disables writing"
+    AssertTrue Not stream.IsClosed, "read open marks stream open"
+    AssertTrue Not stream.AtEndOfStream, "nonempty file starts before EOF"
+    AssertEqual "ab", fileStream.ReadText(2), "legacy read returns a bounded first chunk"
+    AssertEqual "cde", stream.ReadText(3), "interface read continues sequentially"
+    AssertTrue Not stream.AtEndOfStream, "partial reads do not report EOF"
+    AssertEqual "fg", stream.ReadText(20), "oversized read returns only remaining content"
+    AssertTrue stream.AtEndOfStream, "reading final characters reaches EOF"
+    AssertEqual "", stream.ReadText(2), "read after EOF returns empty text"
+    AssertTrue stream.AtEndOfStream, "read after EOF keeps EOF true"
+
+    fileStream.CloseStream
+    AssertTrue stream.IsClosed, "close marks file stream closed"
+    AssertTrue stream.CanRead And Not stream.CanWrite, _
+               "close preserves the configured capabilities"
+    AssertTrue Not stream.AtEndOfStream, "closed file stream is not at EOF"
+    fileStream.CloseStream
+    AssertTrue stream.IsClosed, "repeated close is idempotent"
+    AssertTrue Not stream.HasError, "successful repeated close leaves no error"
+
+    fileStream.OpenForRead emptyPath
+    AssertTrue stream.CanRead And Not stream.CanWrite, "empty file opens read-only"
+    AssertTrue stream.AtEndOfStream, "open empty file is at EOF"
+    AssertEqual "", stream.ReadText(10), "reading empty file returns empty text"
+    AssertTrue stream.AtEndOfStream, "empty file remains at EOF after read"
+    fileStream.CloseStream
+
+    fileStream.OpenForRead readPath
+    AssertEqual "", stream.ReadText(0), "zero read limit returns empty text"
+    AssertEqual "", stream.ReadText(-1), "negative read limit returns empty text"
+    AssertEqual "a", stream.ReadText(1), "non-positive reads do not advance the file"
+    fileStream.CloseStream
+
+    fileStream.OpenForWrite createPath, False
+    AssertTrue Not stream.CanRead And stream.CanWrite, "write open configures write-only access"
+    AssertTrue Not stream.AtEndOfStream, "write-only file stream is not at EOF"
+    AssertEqual 3, fileStream.WriteText("one"), "legacy write returns written character count"
+    AssertEqual 3, stream.WriteText("two"), "interface write returns written character count"
+    On Error Resume Next
+    stream.ReadText 1
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo TestFailure
+    AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, _
+                "read on write-only file stream is unsupported"
+    AssertTrue stream.HasError, "unsupported file read records an error"
+    AssertEqual 1, stream.WriteText("!"), "successful write clears the prior error"
+    AssertTrue Not stream.HasError, "successful file write clears error state"
+    fileStream.CloseStream
+    AssertTrue Not stream.CanRead And stream.CanWrite, _
+               "closing a write stream preserves its configured capabilities"
+    AssertTrue stream.IsClosed, "write stream is closed before external file verification"
+    AssertTrue fileSystem.FileExists(createPath), "closed write stream leaves the file available externally"
+    Set testFile = fileSystem.GetFile(createPath)
+    AssertEqual 7, CDbl(testFile.Size), "closed write stream persists all written characters"
+    Set testFile = Nothing
+    AssertEqual "onetwo!", ReadFileStreamTestFile(fileSystem, createPath, stream), _
+                "writes create a file and preserve successive text"
+
+    fileStream.OpenForRead createPath
+    AssertTrue stream.CanRead And Not stream.CanWrite, _
+               "reopening a written file for reading replaces capabilities"
+    AssertEqual "onetwo!", stream.ReadText(20), _
+                "reopened read stream sees content persisted by the prior close"
+    fileStream.CloseStream
+
+    fileStream.OpenForWrite writePath, False
+    AssertEqual 5, stream.WriteText("fresh"), "overwrite stream accepts new contents"
+    fileStream.CloseStream
+    AssertEqual "fresh", ReadFileStreamTestFile(fileSystem, writePath, stream), _
+                "non-append open overwrites existing content"
+
+    fileStream.OpenForWrite appendPath, True
+    AssertTrue Not stream.CanRead And stream.CanWrite, "append stream is write-only"
+    AssertEqual 3, stream.WriteText("-xy"), "append write reports character count"
+    fileStream.CloseStream
+    AssertEqual "base-xy", ReadFileStreamTestFile(fileSystem, appendPath, stream), _
+                "append open preserves existing content"
+
+    On Error Resume Next
+    fileStream.OpenForRead missingPath
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo TestFailure
+    AssertEqual VBAsh_STREAM_ERROR_OPEN_FAILURE, errorNumber, _
+                "opening a missing file for reading reports open failure"
+    AssertTrue stream.IsClosed, "failed open leaves stream closed"
+    AssertTrue Not stream.CanRead And Not stream.CanWrite, _
+               "failed open does not retain stale capabilities"
+    AssertTrue stream.HasError, "failed open records error state"
+    AssertEqual VBAsh_STREAM_ERROR_OPEN_FAILURE, stream.LastErrorNumber, _
+                "failed open exposes the contract error code"
+    AssertTrue Len(stream.LastErrorDescription) > 0, "failed open exposes a description"
+
+    fileStream.OpenForRead readPath
+    AssertTrue Not stream.HasError, "successful reopen clears a previous open error"
+    On Error Resume Next
+    stream.WriteText "x"
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo TestFailure
+    AssertEqual VBAsh_STREAM_ERROR_NOT_SUPPORTED, errorNumber, _
+                "write on read-only file stream is unsupported"
+    AssertTrue stream.HasError, "unsupported file write records an error"
+    AssertEqual "abc", stream.ReadText(3), "successful read clears the prior write error"
+    AssertTrue Not stream.HasError, "successful file read clears error state"
+
+    fileStream.CloseStream
+    On Error Resume Next
+    stream.ReadText 1
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo TestFailure
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, errorNumber, _
+                "read after close raises the closed-stream error"
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, _
+                "read after close records its contract error"
+    AssertTrue Not stream.AtEndOfStream, "EOF query on a closed stream is false"
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, _
+                "closed-stream EOF query does not mask the prior error"
+    On Error Resume Next
+    stream.WriteText "x"
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo TestFailure
+    AssertEqual VBAsh_STREAM_ERROR_CLOSED, errorNumber, _
+                "write after close raises the closed-stream error"
+    AssertTrue stream.CanRead And Not stream.CanWrite, _
+               "closed-stream operations preserve read capability"
+    AssertTrue stream.IsClosed, "closed-stream operations preserve closed state"
+    fileStream.CloseStream
+    AssertTrue Not stream.HasError, "successful close clears the prior error"
+
+    fileStream.OpenForRead readPath
+    AssertEqual "abcdefg", stream.ReadText(7), "read limit equal to file size returns all text"
+    AssertTrue stream.AtEndOfStream, "exact-size read reaches EOF"
+    fileStream.CloseStream
+
+    fileStream.OpenForWrite createPath, False
+    AssertTrue Not stream.IsClosed, "a closed instance can be reopened"
+    AssertTrue Not stream.CanRead And stream.CanWrite, _
+               "reopen replaces the previous read capability"
+    AssertEqual 4, stream.WriteText("next"), "reopened instance accepts writes"
+    fileStream.CloseStream
+    AssertTrue stream.IsClosed, "reopened write stream is closed before external verification"
+    AssertTrue fileSystem.FileExists(createPath), "reopened write leaves the file available externally"
+    Set testFile = fileSystem.GetFile(createPath)
+    AssertEqual 4, CDbl(testFile.Size), "reopened write persists the replacement content"
+    Set testFile = Nothing
+    AssertEqual "next", ReadFileStreamTestFile(fileSystem, createPath, stream), _
+                "reopen releases the old file and writes to the new stream"
+    failureStage = "after assertion #74; normal cleanup path"
+    GoTo Cleanup
+
+TestFailure:
+    testFailed = True
+    errorNumber = Err.Number
+    errorSource = Err.Source
+    errorDescription = Err.Description
+    If Len(failureStage) = 0 Then
+        failureStage = "after assertion #" & CStr(mLastAssertNumber) & _
+                       " (" & mLastAssertDescription & ")"
+    End If
+    Err.Clear
+
+Cleanup:
+    If Not testFailed Then
+        errorNumber = 0
+        errorSource = ""
+        errorDescription = ""
+        failureStage = ""
+    End If
+    stageTrace = AppendFileStreamStage(stageTrace, "entering Cleanup")
+    CleanupFileStreamTest fileStream, stream, fileSystem, testFolder, testFolderCreated, _
+                          errorNumber, errorSource, errorDescription, failureStage, stageTrace
+    stageTrace = AppendFileStreamStage(stageTrace, "return from CleanupFileStreamTest")
+    If errorNumber <> 0 Then
+        stageTrace = AppendFileStreamStage(stageTrace, "final propagation to RunTest")
+        If Len(errorSource) = 0 Then errorSource = "VBAshTests.TestFileStream"
+        errorDescription = "FileStream test error; first error at [" & failureStage & _
+                           "]; stage trace: " & stageTrace & _
+                           "; original error " & CStr(errorNumber) & _
+                           " [" & errorDescription & "]; source [" & errorSource & _
+                           "]; stream state: " & FileStreamState(stream)
+        On Error GoTo 0
+        Err.Raise errorNumber, errorSource, errorDescription
+    End If
+End Sub
+
+Private Function ReadFileStreamTestFile(ByVal fileSystem As Object, ByVal path As String, _
+                                        ByVal stream As IStream) As String
+    Dim textStream As Object
+    Dim file As Object
+    Dim stage As String
+    Dim fileExists As Boolean
+    Dim fileSize As Double
+    Dim originalErrorNumber As Long
+    Dim originalErrorSource As String
+    Dim originalErrorDescription As String
+
+    On Error GoTo ReadFailure
+    stage = "check file existence"
+    fileExists = fileSystem.FileExists(path)
+    If fileExists Then
+        stage = "get file size"
+        Set file = fileSystem.GetFile(path)
+        fileSize = CDbl(file.Size)
+        Set file = Nothing
+    End If
+    stage = "open independent FileSystemObject TextStream"
+    Set textStream = fileSystem.OpenTextFile(path, 1, False)
+    stage = "read independent FileSystemObject TextStream"
+    ReadFileStreamTestFile = textStream.ReadAll
+    stage = "close independent FileSystemObject TextStream"
+    textStream.Close
+    Set textStream = Nothing
+    Exit Function
+
+ReadFailure:
+    originalErrorNumber = Err.Number
+    originalErrorSource = Err.Source
+    originalErrorDescription = Err.Description
+    On Error GoTo 0
+    Err.Raise originalErrorNumber, originalErrorSource, _
+        "ReadFileStreamTestFile failed during " & stage & _
+        " (error " & CStr(originalErrorNumber) & ": " & originalErrorDescription & _
+        "; source: " & originalErrorSource & "; path: " & path & _
+        "; exists: " & CStr(fileExists) & "; size: " & CStr(fileSize) & _
+        " bytes; IStream closed: " & CStr(stream.IsClosed) & _
+        "; CanRead: " & CStr(stream.CanRead) & _
+        "; CanWrite: " & CStr(stream.CanWrite) & _
+        "; HasError: " & CStr(stream.HasError) & _
+        "; LastErrorNumber: " & CStr(stream.LastErrorNumber) & ")"
+End Function
+
+Private Sub CleanupFileStreamTest(ByVal fileStream As clsFileStream, _
+                                  ByVal stream As IStream, ByVal fileSystem As Object, _
+                                  ByVal folderPath As String, _
+                                  ByVal folderCreated As Boolean, _
+                                  ByRef errorNumber As Long, ByRef errorSource As String, _
+                                  ByRef errorDescription As String, _
+                                  ByRef failureStage As String, ByRef stageTrace As String)
+    Dim cleanupErrorNumber As Long
+    Dim cleanupErrorSource As String
+    Dim cleanupErrorDescription As String
+    Dim cleanupErrorStage As String
+    Dim cleanupErrorDetails As String
+    Dim folderExists As Boolean
+    Dim firstErrorNumber As Long
+    Dim firstErrorSource As String
+    Dim firstErrorDescription As String
+    Dim firstErrorStage As String
+
+    firstErrorNumber = errorNumber
+    firstErrorSource = errorSource
+    firstErrorDescription = errorDescription
+    firstErrorStage = failureStage
+
+    stageTrace = AppendFileStreamStage(stageTrace, "second call to CloseStream")
+    If Not fileStream Is Nothing Then
+        On Error Resume Next
+        Err.Clear
+        fileStream.CloseStream
+        If Err.Number <> 0 Then
+            cleanupErrorNumber = Err.Number
+            cleanupErrorSource = Err.Source
+            cleanupErrorDescription = Err.Description
+            cleanupErrorStage = "second call to CloseStream"
+            cleanupErrorDetails = AppendFileStreamCleanupError(cleanupErrorDetails, _
+                cleanupErrorNumber, cleanupErrorSource, cleanupErrorDescription, cleanupErrorStage)
+            Err.Clear
+        End If
+        On Error GoTo 0
+    End If
+
+    If folderCreated And Not fileSystem Is Nothing Then
+        stageTrace = AppendFileStreamStage(stageTrace, "verify temporary folder exists")
+        On Error Resume Next
+        Err.Clear
+        folderExists = fileSystem.FolderExists(folderPath)
+        If Err.Number <> 0 Then
+            If cleanupErrorNumber = 0 Then
+                cleanupErrorNumber = Err.Number
+                cleanupErrorSource = Err.Source
+                cleanupErrorDescription = Err.Description
+                cleanupErrorStage = "verify temporary folder exists"
+            End If
+            cleanupErrorDetails = AppendFileStreamCleanupError(cleanupErrorDetails, _
+                Err.Number, Err.Source, Err.Description, "verify temporary folder exists")
+            Err.Clear
+        End If
+        On Error GoTo 0
+
+        If folderExists Then
+            stageTrace = AppendFileStreamStage(stageTrace, "delete temporary folder")
+            On Error Resume Next
+            Err.Clear
+            fileSystem.DeleteFolder folderPath, True
+            If Err.Number <> 0 Then
+                If cleanupErrorNumber = 0 Then
+                    cleanupErrorNumber = Err.Number
+                    cleanupErrorSource = Err.Source
+                    cleanupErrorDescription = Err.Description
+                    cleanupErrorStage = "delete temporary folder"
+                End If
+                cleanupErrorDetails = AppendFileStreamCleanupError(cleanupErrorDetails, _
+                    Err.Number, Err.Source, Err.Description, "delete temporary folder")
+                Err.Clear
+            End If
+            On Error GoTo 0
+        End If
+    End If
+
+    If firstErrorNumber <> 0 Then
+        errorNumber = firstErrorNumber
+        errorSource = firstErrorSource
+        errorDescription = firstErrorDescription
+        failureStage = firstErrorStage
+        If cleanupErrorNumber <> 0 Then
+            errorDescription = errorDescription & "; cleanup errors: " & cleanupErrorDetails
+        End If
+    ElseIf cleanupErrorNumber <> 0 Then
+        errorNumber = cleanupErrorNumber
+        errorSource = cleanupErrorSource
+        errorDescription = "Cleanup errors: " & cleanupErrorDetails
+        failureStage = cleanupErrorStage
+    End If
+    stageTrace = AppendFileStreamStage(stageTrace, "return from cleanup")
+End Sub
+
+Private Function AppendFileStreamCleanupError(ByVal details As String, _
+                                              ByVal errorNumber As Long, _
+                                              ByVal errorSource As String, _
+                                              ByVal errorDescription As String, _
+                                              ByVal stage As String) As String
+    If Len(details) > 0 Then details = details & "; "
+    AppendFileStreamCleanupError = details & "error " & CStr(errorNumber) & _
+                                   " [" & errorDescription & "]; source [" & errorSource & _
+                                   "]; stage [" & stage & "]"
+End Function
+
+Private Function AppendFileStreamStage(ByVal stageTrace As String, ByVal stage As String) As String
+    If Len(stageTrace) > 0 Then stageTrace = stageTrace & " > "
+    AppendFileStreamStage = stageTrace & stage
+End Function
+
+Private Function FileStreamState(ByVal stream As IStream) As String
+    If stream Is Nothing Then
+        FileStreamState = "instance unavailable"
+    Else
+        FileStreamState = "IsClosed=" & CStr(stream.IsClosed) & _
+                          ", CanRead=" & CStr(stream.CanRead) & _
+                          ", CanWrite=" & CStr(stream.CanWrite) & _
+                          ", HasError=" & CStr(stream.HasError) & _
+                          ", LastErrorNumber=" & CStr(stream.LastErrorNumber)
+    End If
+End Function
+
 Private Function ReadRedirectedFile(ByVal fileSystem As Object, ByVal path As String, _
                                     ByVal expectedContents As String, ByVal description As String) As String
     Dim textStream As Object
@@ -1446,7 +2180,11 @@ End Function
 
 Private Sub AssertEqual(ByVal expected As Variant, ByVal actual As Variant, ByVal description As String)
     mAssertions = mAssertions + 1
+    mLastAssertNumber = mAssertions - mSuiteStart
+    mLastAssertDescription = description
     If CStr(expected) <> CStr(actual) Then
+        mFailExpected = CStr(expected)
+        mFailActual = CStr(actual)
         Err.Raise ASSERT_EQUAL_ERROR, "VBAshTests", _
             description & ": expected [" & CStr(expected) & "], got [" & CStr(actual) & "]"
     End If
@@ -1454,5 +2192,11 @@ End Sub
 
 Private Sub AssertTrue(ByVal condition As Boolean, ByVal description As String)
     mAssertions = mAssertions + 1
-    If Not condition Then Err.Raise ASSERT_TRUE_ERROR, "VBAshTests", description
+    mLastAssertNumber = mAssertions - mSuiteStart
+    mLastAssertDescription = description
+    If Not condition Then
+        mFailExpected = "True"
+        mFailActual = "False"
+        Err.Raise ASSERT_TRUE_ERROR, "VBAshTests", description
+    End If
 End Sub

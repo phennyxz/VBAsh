@@ -1,3 +1,4 @@
+' @VBAshRevision clsMemoryStream-r2
 Option Explicit
 Implements IStream
 
@@ -8,6 +9,11 @@ Private mCanWrite As Boolean
 Private mIsClosed As Boolean
 Private mLastErrorNumber As Long
 Private mLastErrorDescription As String
+
+' Identifica a revisão carregada; não altera o comportamento do stream.
+Public Property Get ModuleRevision() As String
+    ModuleRevision = "clsMemoryStream-r2"
+End Property
 
 Private Sub Class_Initialize()
     Initialize
