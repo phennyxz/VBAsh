@@ -1,4 +1,4 @@
-' @VBAshRevision VBAshTests-r2
+' @VBAshRevision VBAshTests-r3
 Option Explicit
 
 Private mAssertions As Long
@@ -13,7 +13,7 @@ Private mLastAssertNumber As Long
 Private mLastAssertDescription As String
 Private mFailExpected As String
 Private mFailActual As String
-Private Const RUNNER_REVISION As String = "VBAshTests-r2"
+Private Const RUNNER_REVISION As String = "VBAshTests-r3"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
@@ -1731,6 +1731,9 @@ Private Sub TestFileStream()
     Dim errorNumber As Long
     Dim errorSource As String
     Dim errorDescription As String
+    Dim testFailed As Boolean
+    Dim failureStage As String
+    Dim stageTrace As String
 
     On Error GoTo TestFailure
     Set fileSystem = CreateObject("Scripting.FileSystemObject")
@@ -1917,18 +1920,39 @@ Private Sub TestFileStream()
     Set testFile = Nothing
     AssertEqual "next", ReadFileStreamTestFile(fileSystem, createPath, stream), _
                 "reopen releases the old file and writes to the new stream"
+    failureStage = "after assertion #74; normal cleanup path"
     GoTo Cleanup
 
 TestFailure:
+    testFailed = True
     errorNumber = Err.Number
     errorSource = Err.Source
     errorDescription = Err.Description
+    If Len(failureStage) = 0 Then
+        failureStage = "after assertion #" & CStr(mLastAssertNumber) & _
+                       " (" & mLastAssertDescription & ")"
+    End If
     Err.Clear
 
 Cleanup:
-    CleanupFileStreamTest fileStream, fileSystem, testFolder, testFolderCreated, _
-                          errorNumber, errorSource, errorDescription
+    If Not testFailed Then
+        errorNumber = 0
+        errorSource = ""
+        errorDescription = ""
+        failureStage = ""
+    End If
+    stageTrace = AppendFileStreamStage(stageTrace, "entering Cleanup")
+    CleanupFileStreamTest fileStream, stream, fileSystem, testFolder, testFolderCreated, _
+                          errorNumber, errorSource, errorDescription, failureStage, stageTrace
+    stageTrace = AppendFileStreamStage(stageTrace, "return from CleanupFileStreamTest")
     If errorNumber <> 0 Then
+        stageTrace = AppendFileStreamStage(stageTrace, "final propagation to RunTest")
+        If Len(errorSource) = 0 Then errorSource = "VBAshTests.TestFileStream"
+        errorDescription = "FileStream test error; first error at [" & failureStage & _
+                           "]; stage trace: " & stageTrace & _
+                           "; original error " & CStr(errorNumber) & _
+                           " [" & errorDescription & "]; source [" & errorSource & _
+                           "]; stream state: " & FileStreamState(stream)
         On Error GoTo 0
         Err.Raise errorNumber, errorSource, errorDescription
     End If
@@ -1981,38 +2005,127 @@ ReadFailure:
 End Function
 
 Private Sub CleanupFileStreamTest(ByVal fileStream As clsFileStream, _
-                                  ByVal fileSystem As Object, ByVal folderPath As String, _
+                                  ByVal stream As IStream, ByVal fileSystem As Object, _
+                                  ByVal folderPath As String, _
                                   ByVal folderCreated As Boolean, _
                                   ByRef errorNumber As Long, ByRef errorSource As String, _
-                                  ByRef errorDescription As String)
+                                  ByRef errorDescription As String, _
+                                  ByRef failureStage As String, ByRef stageTrace As String)
     Dim cleanupErrorNumber As Long
+    Dim cleanupErrorSource As String
     Dim cleanupErrorDescription As String
+    Dim cleanupErrorStage As String
+    Dim cleanupErrorDetails As String
+    Dim folderExists As Boolean
+    Dim firstErrorNumber As Long
+    Dim firstErrorSource As String
+    Dim firstErrorDescription As String
+    Dim firstErrorStage As String
 
-    On Error Resume Next
-    If Not fileStream Is Nothing Then fileStream.CloseStream
-    If Err.Number <> 0 Then
-        cleanupErrorNumber = Err.Number
-        cleanupErrorDescription = Err.Description
+    firstErrorNumber = errorNumber
+    firstErrorSource = errorSource
+    firstErrorDescription = errorDescription
+    firstErrorStage = failureStage
+
+    stageTrace = AppendFileStreamStage(stageTrace, "second call to CloseStream")
+    If Not fileStream Is Nothing Then
+        On Error Resume Next
         Err.Clear
+        fileStream.CloseStream
+        If Err.Number <> 0 Then
+            cleanupErrorNumber = Err.Number
+            cleanupErrorSource = Err.Source
+            cleanupErrorDescription = Err.Description
+            cleanupErrorStage = "second call to CloseStream"
+            cleanupErrorDetails = AppendFileStreamCleanupError(cleanupErrorDetails, _
+                cleanupErrorNumber, cleanupErrorSource, cleanupErrorDescription, cleanupErrorStage)
+            Err.Clear
+        End If
+        On Error GoTo 0
     End If
-    If folderCreated Then
-        If Not fileSystem Is Nothing Then
-            If fileSystem.FolderExists(folderPath) Then fileSystem.DeleteFolder folderPath, True
+
+    If folderCreated And Not fileSystem Is Nothing Then
+        stageTrace = AppendFileStreamStage(stageTrace, "verify temporary folder exists")
+        On Error Resume Next
+        Err.Clear
+        folderExists = fileSystem.FolderExists(folderPath)
+        If Err.Number <> 0 Then
+            If cleanupErrorNumber = 0 Then
+                cleanupErrorNumber = Err.Number
+                cleanupErrorSource = Err.Source
+                cleanupErrorDescription = Err.Description
+                cleanupErrorStage = "verify temporary folder exists"
+            End If
+            cleanupErrorDetails = AppendFileStreamCleanupError(cleanupErrorDetails, _
+                Err.Number, Err.Source, Err.Description, "verify temporary folder exists")
+            Err.Clear
+        End If
+        On Error GoTo 0
+
+        If folderExists Then
+            stageTrace = AppendFileStreamStage(stageTrace, "delete temporary folder")
+            On Error Resume Next
+            Err.Clear
+            fileSystem.DeleteFolder folderPath, True
+            If Err.Number <> 0 Then
+                If cleanupErrorNumber = 0 Then
+                    cleanupErrorNumber = Err.Number
+                    cleanupErrorSource = Err.Source
+                    cleanupErrorDescription = Err.Description
+                    cleanupErrorStage = "delete temporary folder"
+                End If
+                cleanupErrorDetails = AppendFileStreamCleanupError(cleanupErrorDetails, _
+                    Err.Number, Err.Source, Err.Description, "delete temporary folder")
+                Err.Clear
+            End If
+            On Error GoTo 0
         End If
     End If
-    If Err.Number <> 0 And cleanupErrorNumber = 0 Then
-        cleanupErrorNumber = Err.Number
-        cleanupErrorDescription = Err.Description
-        Err.Clear
-    End If
-    On Error GoTo 0
 
-    If errorNumber = 0 And cleanupErrorNumber <> 0 Then
+    If firstErrorNumber <> 0 Then
+        errorNumber = firstErrorNumber
+        errorSource = firstErrorSource
+        errorDescription = firstErrorDescription
+        failureStage = firstErrorStage
+        If cleanupErrorNumber <> 0 Then
+            errorDescription = errorDescription & "; cleanup errors: " & cleanupErrorDetails
+        End If
+    ElseIf cleanupErrorNumber <> 0 Then
         errorNumber = cleanupErrorNumber
-        errorSource = "VBAshTests.CleanupFileStreamTest"
-        errorDescription = "Cleanup failed: " & cleanupErrorDescription
+        errorSource = cleanupErrorSource
+        errorDescription = "Cleanup errors: " & cleanupErrorDetails
+        failureStage = cleanupErrorStage
     End If
+    stageTrace = AppendFileStreamStage(stageTrace, "return from cleanup")
 End Sub
+
+Private Function AppendFileStreamCleanupError(ByVal details As String, _
+                                              ByVal errorNumber As Long, _
+                                              ByVal errorSource As String, _
+                                              ByVal errorDescription As String, _
+                                              ByVal stage As String) As String
+    If Len(details) > 0 Then details = details & "; "
+    AppendFileStreamCleanupError = details & "error " & CStr(errorNumber) & _
+                                   " [" & errorDescription & "]; source [" & errorSource & _
+                                   "]; stage [" & stage & "]"
+End Function
+
+Private Function AppendFileStreamStage(ByVal stageTrace As String, ByVal stage As String) As String
+    If Len(stageTrace) > 0 Then stageTrace = stageTrace & " > "
+    AppendFileStreamStage = stageTrace & stage
+End Function
+
+Private Function FileStreamState(ByVal stream As IStream) As String
+    If stream Is Nothing Then
+        FileStreamState = "instance unavailable"
+    Else
+        FileStreamState = "IsClosed=" & CStr(stream.IsClosed) & _
+                          ", CanRead=" & CStr(stream.CanRead) & _
+                          ", CanWrite=" & CStr(stream.CanWrite) & _
+                          ", HasError=" & CStr(stream.HasError) & _
+                          ", LastErrorNumber=" & CStr(stream.LastErrorNumber)
+    End If
+End Function
 
 Private Function ReadRedirectedFile(ByVal fileSystem As Object, ByVal path As String, _
                                     ByVal expectedContents As String, ByVal description As String) As String
