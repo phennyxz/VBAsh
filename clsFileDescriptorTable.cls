@@ -1,4 +1,4 @@
-' @VBAshRevision clsFileDescriptorTable-r1
+' @VBAshRevision clsFileDescriptorTable-r2
 Option Explicit
 
 Private Const FD_ERROR_NOT_INITIALIZED As Long = vbObjectError + 1250
@@ -6,14 +6,17 @@ Private Const FD_ERROR_INVALID As Long = vbObjectError + 1251
 Private Const FD_ERROR_NOT_FOUND As Long = vbObjectError + 1252
 Private Const FD_ERROR_NO_FREE_DESCRIPTOR As Long = vbObjectError + 1253
 Private Const FD_ERROR_ALREADY_INITIALIZED As Long = vbObjectError + 1254
+Private Const FD_ERROR_CLOSE_ALL As Long = vbObjectError + 1255
+Private Const FD_ERROR_CLEANUP_IN_PROGRESS As Long = vbObjectError + 1256
 
 Private mDescriptors As Object
 Private mOwnedStreams As Collection
 Private mIsInitialized As Boolean
+Private mClosingAll As Boolean
 
 ' Identifies the table API and ownership implementation revision.
 Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsFileDescriptorTable-r1"
+    ModuleRevision = "clsFileDescriptorTable-r2"
 End Property
 
 Private Sub Class_Initialize()
@@ -67,6 +70,7 @@ End Function
 Public Sub SetDescriptor(ByVal descriptor As Long, ByVal stream As IStream, _
                          Optional ByVal ownsStream As Boolean = False)
     EnsureInitialized "SetDescriptor"
+    EnsureNotClosingAll "SetDescriptor"
     ValidateDescriptor descriptor, "SetDescriptor"
     If stream Is Nothing Then
         RaiseTableError FD_ERROR_INVALID, "SetDescriptor", _
@@ -82,6 +86,7 @@ Public Sub DuplicateDescriptor(ByVal sourceDescriptor As Long, _
     Dim stream As IStream
 
     EnsureInitialized "DuplicateDescriptor"
+    EnsureNotClosingAll "DuplicateDescriptor"
     ValidateDescriptor sourceDescriptor, "DuplicateDescriptor"
     ValidateDescriptor destinationDescriptor, "DuplicateDescriptor"
     If Not mDescriptors.Exists(CStr(sourceDescriptor)) Then
@@ -101,6 +106,7 @@ Public Sub CloseDescriptor(ByVal descriptor As Long)
     Dim key As String
 
     EnsureInitialized "CloseDescriptor"
+    EnsureNotClosingAll "CloseDescriptor"
     ValidateDescriptor descriptor, "CloseDescriptor"
     key = CStr(descriptor)
     If Not mDescriptors.Exists(key) Then
@@ -116,6 +122,106 @@ Public Sub CloseDescriptor(ByVal descriptor As Long)
         End If
     End If
     mDescriptors.Remove key
+End Sub
+
+' The caller must explicitly clean up before releasing the table. Ownership
+' and alias counts are local to this instance, not to other tables or callers.
+Public Sub CloseAll()
+    Dim keys As Variant
+    Dim streams As Collection
+    Dim stream As IStream
+    Dim candidate As IStream
+    Dim processed() As Boolean
+    Dim index As Long
+    Dim other As Long
+    Dim count As Long
+    Dim descriptorList As String
+    Dim failures As String
+    Dim closeNumber As Long
+    Dim closeSource As String
+    Dim closeDescription As String
+    Dim unexpectedNumber As Long
+    Dim unexpectedSource As String
+    Dim unexpectedDescription As String
+
+    EnsureInitialized "CloseAll"
+    EnsureNotClosingAll "CloseAll"
+    count = mDescriptors.Count
+    If count = 0 Then Exit Sub
+
+    keys = mDescriptors.Keys
+    Set streams = New Collection
+    ReDim processed(0 To count - 1)
+    For index = 0 To count - 1
+        Set stream = mDescriptors.Item(CStr(keys(index)))
+        streams.Add stream
+    Next index
+
+    mClosingAll = True
+    On Error GoTo UnexpectedFailure
+    For index = 0 To count - 1
+        If Not processed(index) Then
+            Set stream = streams.Item(index + 1)
+            descriptorList = ""
+            For other = index To count - 1
+                Set candidate = streams.Item(other + 1)
+                If candidate Is stream Then
+                    processed(other) = True
+                    If Len(descriptorList) > 0 Then descriptorList = descriptorList & ", "
+                    descriptorList = descriptorList & CStr(keys(other))
+                End If
+            Next other
+
+            closeNumber = 0
+            closeSource = ""
+            closeDescription = ""
+            If IsOwnedStream(stream) Then
+                TryCloseForCleanup stream, closeNumber, closeSource, closeDescription
+            End If
+            If closeNumber <> 0 Then
+                If Len(failures) > 0 Then failures = failures & vbCrLf
+                failures = failures & "FDs [" & descriptorList & "]: error " & _
+                           CStr(closeNumber) & "; source [" & closeSource & _
+                           "]; description [" & closeDescription & "]"
+            Else
+                For other = index To count - 1
+                    Set candidate = streams.Item(other + 1)
+                    If candidate Is stream Then mDescriptors.Remove CStr(keys(other))
+                Next other
+                RemoveOwnedStream stream
+            End If
+        End If
+    Next index
+    mClosingAll = False
+    On Error GoTo 0
+    If Len(failures) > 0 Then
+        Err.Raise FD_ERROR_CLOSE_ALL, "clsFileDescriptorTable.CloseAll", failures
+    End If
+    Exit Sub
+
+UnexpectedFailure:
+    unexpectedNumber = Err.Number
+    unexpectedSource = Err.Source
+    unexpectedDescription = Err.Description
+    mClosingAll = False
+    On Error GoTo 0
+    If Len(failures) > 0 Then
+        unexpectedDescription = unexpectedDescription & vbCrLf & _
+                                "Earlier close failures:" & vbCrLf & failures
+    End If
+    Err.Raise unexpectedNumber, unexpectedSource, unexpectedDescription
+End Sub
+
+' Only stream close errors are collected; other errors propagate normally.
+Private Sub TryCloseForCleanup(ByVal stream As IStream, ByRef errorNumber As Long, _
+                               ByRef errorSource As String, ByRef errorDescription As String)
+    On Error GoTo CloseFailure
+    stream.CloseStream
+    Exit Sub
+CloseFailure:
+    errorNumber = Err.Number
+    errorSource = Err.Source
+    errorDescription = Err.Description
 End Sub
 
 ' Returns the lowest unused descriptor at or above 3 without reserving it.
@@ -231,6 +337,13 @@ Private Sub EnsureInitialized(ByVal operation As String)
     If Not mIsInitialized Then
         RaiseTableError FD_ERROR_NOT_INITIALIZED, operation, _
                         "Initialize the standard descriptors before using the table."
+    End If
+End Sub
+
+Private Sub EnsureNotClosingAll(ByVal operation As String)
+    If mClosingAll Then
+        RaiseTableError FD_ERROR_CLEANUP_IN_PROGRESS, operation, _
+                        "The descriptor table is being cleaned up."
     End If
 End Sub
 

@@ -10,11 +10,19 @@ Private mLastErrorNumber As Long
 Private mLastErrorDescription As String
 Private mFailClose As Boolean
 Private mCloseCount As Long
+Private mCloseBeforeFailure As Boolean
+Private mCloseErrorNumber As Long
+Private mCloseErrorSource As String
+Private mCloseErrorDescription As String
+Private mCleanupReentryTable As clsFileDescriptorTable
 
 Private Sub Class_Initialize()
     mPosition = 1
     mCanRead = True
     mCanWrite = True
+    mCloseErrorNumber = vbObjectError + 1260
+    mCloseErrorSource = "clsStreamContractProbe.CloseStream"
+    mCloseErrorDescription = "Configured close failure."
 End Sub
 
 Public Sub ConfigureCapabilities(ByVal canRead As Boolean, ByVal canWrite As Boolean)
@@ -24,6 +32,20 @@ End Sub
 
 Public Sub ConfigureCloseFailure(ByVal shouldFail As Boolean)
     mFailClose = shouldFail
+End Sub
+
+Public Sub ConfigureCloseFailureDetails(ByVal errorNumber As Long, ByVal errorSource As String, _
+                                        ByVal errorDescription As String, _
+                                        ByVal closeBeforeFailure As Boolean)
+    mCloseErrorNumber = errorNumber
+    mCloseErrorSource = errorSource
+    mCloseErrorDescription = errorDescription
+    mCloseBeforeFailure = closeBeforeFailure
+    mFailClose = True
+End Sub
+
+Public Sub ConfigureCleanupReentry(ByVal table As clsFileDescriptorTable)
+    Set mCleanupReentryTable = table
 End Sub
 
 Public Property Get CloseCount() As Long
@@ -91,9 +113,10 @@ End Function
 
 Private Sub IStream_CloseStream()
     mCloseCount = mCloseCount + 1
+    If Not mCleanupReentryTable Is Nothing Then mCleanupReentryTable.CloseAll
     If mFailClose Then
-        Err.Raise vbObjectError + 1260, "clsStreamContractProbe.CloseStream", _
-                  "Configured close failure."
+        If mCloseBeforeFailure Then mIsClosed = True
+        Err.Raise mCloseErrorNumber, mCloseErrorSource, mCloseErrorDescription
     End If
     mIsClosed = True
     ClearStreamError

@@ -1,4 +1,4 @@
-' @VBAshRevision VBAshTests-r5
+' @VBAshRevision VBAshTests-r6
 Option Explicit
 
 Private mAssertions As Long
@@ -13,11 +13,11 @@ Private mLastAssertNumber As Long
 Private mLastAssertDescription As String
 Private mFailExpected As String
 Private mFailActual As String
-Private Const RUNNER_REVISION As String = "VBAshTests-r5"
+Private Const RUNNER_REVISION As String = "VBAshTests-r6"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
-Private Const EXPECTED_TEST_COUNT As Long = 18
+Private Const EXPECTED_TEST_COUNT As Long = 19
 
 Public Sub VBAsh_RunTests()
     Dim startedAt As Date
@@ -55,6 +55,7 @@ Public Sub VBAsh_RunTests()
     RunTest "NullStream"
     RunTest "FileStream"
     RunTest "FileDescriptorTable"
+    RunTest "FileDescriptorTableCloseAll"
 
     finishedAt = Now
     summary = TestRunSummary()
@@ -111,6 +112,7 @@ Private Sub RunTest(ByVal testName As String)
         Case "NullStream": TestNullStream
         Case "FileStream": TestFileStream
         Case "FileDescriptorTable": TestFileDescriptorTable
+        Case "FileDescriptorTableCloseAll": TestFileDescriptorTableCloseAll
         Case Else
             Err.Raise vbObjectError + 1102, "VBAshTests.RunTest", _
                       "Teste não registrado: " & testName
@@ -1692,6 +1694,143 @@ Private Sub TestFileDescriptorTable()
 
     Set table = Nothing
     Set ownedDefaults = Nothing
+End Sub
+
+Private Sub TestFileDescriptorTableCloseAll()
+    Dim table As clsFileDescriptorTable
+    Dim borrowed As clsStreamContractProbe
+    Dim failed As clsStreamContractProbe
+    Dim partial As clsStreamContractProbe
+    Dim succeeded As clsStreamContractProbe
+    Dim stream As IStream
+    Dim errorNumber As Long
+    Dim errorSource As String
+    Dim errorDescription As String
+
+    Set table = New clsFileDescriptorTable
+    On Error Resume Next
+    table.CloseAll
+    errorNumber = Err.Number
+    errorSource = Err.Source
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual vbObjectError + 1250, errorNumber, "CloseAll requires initialization"
+    AssertEqual "clsFileDescriptorTable.CloseAll", errorSource, _
+                "uninitialized cleanup identifies its operation"
+
+    Set borrowed = New clsStreamContractProbe
+    Set failed = New clsStreamContractProbe
+    Set partial = New clsStreamContractProbe
+    Set succeeded = New clsStreamContractProbe
+    failed.ConfigureCloseFailureDetails vbObjectError + 1280, "failure.one", "first failure", False
+    partial.ConfigureCloseFailureDetails vbObjectError + 1281, "failure.two", "partial failure", True
+    table.Initialize borrowed, borrowed, borrowed
+    table.SetDescriptor 3, failed, True
+    table.DuplicateDescriptor 3, 4
+    table.SetDescriptor 5, partial, True
+    table.DuplicateDescriptor 5, 6
+    table.SetDescriptor 7, succeeded, True
+    table.DuplicateDescriptor 7, 8
+    table.SetDescriptor 9, borrowed
+
+    On Error Resume Next
+    table.CloseAll
+    errorNumber = Err.Number
+    errorSource = Err.Source
+    errorDescription = Err.Description
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual vbObjectError + 1255, errorNumber, "multiple close failures raise aggregate error"
+    AssertEqual "clsFileDescriptorTable.CloseAll", errorSource, "aggregate identifies CloseAll"
+    AssertTrue InStr(1, errorDescription, "FDs [3, 4]: error " & CStr(vbObjectError + 1280) & _
+               "; source [failure.one]; description [first failure]", vbBinaryCompare) > 0 Or _
+               InStr(1, errorDescription, "FDs [4, 3]: error " & CStr(vbObjectError + 1280) & _
+               "; source [failure.one]; description [first failure]", vbBinaryCompare) > 0, _
+               "aggregate includes all aliases and original first error"
+    AssertTrue InStr(1, errorDescription, "FDs [5, 6]: error " & CStr(vbObjectError + 1281) & _
+               "; source [failure.two]; description [partial failure]", vbBinaryCompare) > 0 Or _
+               InStr(1, errorDescription, "FDs [6, 5]: error " & CStr(vbObjectError + 1281) & _
+               "; source [failure.two]; description [partial failure]", vbBinaryCompare) > 0, _
+               "aggregate includes all aliases and original partial-close error"
+    AssertEqual 1, failed.CloseCount, "failed owned aliases are closed only once per attempt"
+    AssertEqual 1, partial.CloseCount, "partially closed aliases are attempted once"
+    AssertEqual 1, succeeded.CloseCount, "later distinct owned stream is attempted after failures"
+    AssertEqual 0, borrowed.CloseCount, "borrowed aliases are never closed"
+    AssertTrue DescriptorStreamIsClosed(partial), "partial failure can leave the stream closed"
+    AssertTrue DescriptorStreamIsClosed(succeeded), "successful owned stream is closed"
+    AssertTrue Not table.HasDescriptor(0) And Not table.HasDescriptor(1) And _
+               Not table.HasDescriptor(2) And Not table.HasDescriptor(9), _
+               "all borrowed descriptors are removed"
+    AssertTrue Not table.HasDescriptor(7) And Not table.HasDescriptor(8), _
+               "all aliases of a successful owned stream are removed"
+    AssertTrue table.HasDescriptor(3) And table.HasDescriptor(4) And _
+               table.HasDescriptor(5) And table.HasDescriptor(6), _
+               "all aliases of failed owned streams remain"
+    Set stream = table.GetDescriptor(3)
+    AssertTrue stream Is failed, "first failed mapping preserves stream identity"
+    Set stream = table.GetDescriptor(4)
+    AssertTrue stream Is failed, "first failed alias preserves stream identity"
+    Set stream = table.GetDescriptor(5)
+    AssertTrue stream Is partial, "partial failure preserves stream identity"
+    Set stream = table.GetDescriptor(6)
+    AssertTrue stream Is partial, "partial failure preserves alias identity"
+    AssertEqual 7, table.FindFreeDescriptor(), "successful cleanup releases occupied descriptor numbers"
+
+    failed.ConfigureCloseFailure False
+    partial.ConfigureCloseFailure False
+    table.CloseAll
+    AssertEqual 2, failed.CloseCount, "retry closes the first retained owned stream"
+    AssertEqual 2, partial.CloseCount, "retry closes a stream that closed before reporting failure"
+    AssertEqual 1, succeeded.CloseCount, "retry does not close previously removed streams"
+    AssertEqual 0, borrowed.CloseCount, "retry does not close previously removed borrowed streams"
+    AssertTrue Not table.HasDescriptor(3) And Not table.HasDescriptor(4) And _
+               Not table.HasDescriptor(5) And Not table.HasDescriptor(6), _
+               "successful retry removes every retained alias"
+    AssertTrue DescriptorStreamIsClosed(failed), "retry closes the previously failed stream"
+    AssertEqual 3, table.FindFreeDescriptor(), "empty table returns the first free descriptor"
+    table.CloseAll
+    AssertEqual 2, failed.CloseCount, "repeated cleanup on an empty table does not close again"
+    AssertEqual 2, partial.CloseCount, "repeated cleanup does not retry removed partial stream"
+
+    table.SetDescriptor 0, borrowed
+    table.SetDescriptor 3, succeeded
+    AssertTrue table.HasDescriptor(0) And table.HasDescriptor(3), _
+               "the initialized table can be reused after cleanup"
+    AssertEqual 4, table.FindFreeDescriptor(), "free descriptor search reflects reuse"
+    On Error Resume Next
+    table.Initialize borrowed, borrowed, borrowed
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual vbObjectError + 1254, errorNumber, "Initialize remains single-use after cleanup"
+    Set stream = table.GetDescriptor(0)
+    AssertTrue stream Is borrowed, "rejected initialization preserves reused descriptors"
+    table.CloseAll
+    AssertEqual 0, borrowed.CloseCount, "cleanup after reuse does not close borrowed streams"
+    AssertEqual 1, succeeded.CloseCount, "reused borrowed closed stream is not closed again"
+    AssertTrue Not table.HasDescriptor(0) And Not table.HasDescriptor(3), _
+               "cleanup removes descriptors added after reuse"
+
+    Set failed = New clsStreamContractProbe
+    Set succeeded = New clsStreamContractProbe
+    failed.ConfigureCleanupReentry table
+    table.SetDescriptor 3, failed, True
+    table.SetDescriptor 4, succeeded, True
+    On Error Resume Next
+    table.CloseAll
+    errorNumber = Err.Number
+    errorDescription = Err.Description
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual vbObjectError + 1255, errorNumber, "reentrant cleanup becomes an aggregate close error"
+    AssertTrue InStr(1, errorDescription, "error " & CStr(vbObjectError + 1256), vbBinaryCompare) > 0, _
+               "aggregate identifies the rejected reentrant cleanup"
+    AssertTrue table.HasDescriptor(3) And Not table.HasDescriptor(4), _
+               "reentrant failure preserves its FD while other streams are closed"
+    AssertEqual 1, succeeded.CloseCount, "reentrant cleanup does not stop another stream"
+    failed.ConfigureCleanupReentry Nothing
+    table.CloseAll
+    AssertEqual 2, failed.CloseCount, "retry succeeds after reentry is disabled"
 End Sub
 
 Private Function DescriptorStreamIsClosed(ByVal streamObject As Object) As Boolean
