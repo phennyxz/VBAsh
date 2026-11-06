@@ -176,3 +176,32 @@ Resultado real informado pelo usuário, executado no Excel com `VBAshTests-r3`. 
 | Demais 14 suítes | PASS | Contagens individuais não fornecidas |
 
 O usuário informou que todas as demais suítes passaram. Nenhuma saída original do executor foi anexada a este registro. O resultado é uma execução real relatada pelo usuário, não uma verificação independente dos arquivos deste checkout; os históricos de execuções anteriores permanecem inalterados.
+
+## Implementação isolada de `clsFileDescriptorTable` — 2026-11-06
+
+| Campo | Resultado |
+|---|---|
+| Branch / base | `feature/descriptor-table`, baseada em `main` no commit `d9dde542db555e68191cf65a518a9f00c7d1a458` |
+| Execução Excel/VBA | Não executada; Excel/VBA não está disponível neste ambiente |
+| Suítes / assertions executadas nesta sessão | 0 / 0 |
+| Estado de `TestFileDescriptorTable` | Adicionada ao runner como a 18ª suíte; NOT RUN |
+| Implementação | A tabela agora inicializa explicitamente FD 0/1/2 com `IStream` fornecidos, consulta/associa/duplica/fecha descritores e encontra o menor FD livre desde 3. Duplicatas preservam identidade de objeto; ownership é por identidade e permanece ativo enquanto houver descritor associado. Streams emprestados não são fechados pela tabela. |
+| Erros e substituição | Números negativos, descritores ausentes, operações antes de inicializar e associação a `Nothing` são rejeitados. Associação inválida mantém o mapeamento anterior. Fechamento final de stream próprio ocorre antes de remover o FD; se falhar, o erro original é propagado com contexto e a associação fica disponível para retry. |
+| Testes adicionados | Inicialização padrão, capacidades/identidade, consulta, busca de FD livre, aliasing e escrita compartilhada, fechamento de referência emprestada/própria, substituição, validação, stream previamente fechado e retry após falha de `CloseStream`. |
+| Verificações estáticas | PASS: `git diff --check`; auditoria estrutural de 35 módulos VBA; tags e propriedades de revisão consistentes quando presentes; 18 suítes registradas, despachadas e esperadas; 62 assertions presentes no fonte da nova suíte. Nenhuma compilação VBA é alegada. |
+
+A tabela não cria streams padrão implicitamente e ainda não está integrada a `clsSession`, executor, redirecionamentos ou pipes. Os resultados históricos de execução não foram alterados; em particular, o relatório informado de `VBAshTests-r3` não valida esta nova suíte.
+
+## Correção de compilação em `TestFileDescriptorTable` — 2026-11-06
+
+Erro de compilação reportado no Excel: `replacementStream.CloseStream` em `VBAshTests.bas`. `clsMemoryStream` implementa o membro como `Private Sub IStream_CloseStream()`, acessível apenas por referência `IStream`. O teste agora atribui `replacementStream` à variável `stream` (`IStream`) e chama `CloseStream` por ela; a visibilidade em `clsMemoryStream` não foi alterada. Inspeção estática das demais chamadas a membros de `IStream` em variáveis de classes concretas: nenhuma outra incompatível (`clsFileStream` expõe `ReadText`/`WriteText`/`CloseStream` públicos legados). Runner avançou para `VBAshTests-r5`. Verificação apenas estática; compilação e execução no Excel continuam pendentes.
+
+## Execução Excel informada — 2026-11-06
+
+O usuário informou execução real em Excel/VBA de `VBAshTests-r5`: 18/18 suítes PASS, 0 FAIL, 0 ERROR e 718 assertions, incluindo 62 PASS em `FileDescriptorTable`. Módulos identificados: `VBAshTests-r5`, `IStream-r1`, `clsFileStream-r2`, `clsMemoryStream-r2`, `clsNullStream-r2` e `clsFileDescriptorTable-r1`. O relatório não identificou o checkout Git: commit e branch UNKNOWN e correspondência entre checkout e módulos UNVERIFIED. O resultado não foi verificado independentemente nesta sessão.
+
+## Limpeza explícita da tabela — `CloseAll`
+
+`clsFileDescriptorTable-r2` acrescenta limpeza explícita solicitada ao chamador: streams próprios são fechados uma vez por identidade; FDs emprestados são removidos sem fechamento. Um erro de fechamento não impede os demais: FDs e ownership do stream falho permanecem, os erros originais são agregados com todos os FDs iniciais e o chamador pode repetir a operação. A tabela permanece inicializada e reutilizável, mas não permite outra `Initialize`; não há limpeza automática em `Class_Terminate`. Ownership é local à instância e não rastreia referências externas.
+
+`VBAshTests-r6` adiciona a suíte `FileDescriptorTableCloseAll` e mantém as suítes anteriores. Ela cobre aliases, emprestados, erros múltiplos e originais, sucesso parcial, stream fechado antes de falhar, retry, limpeza repetida, reentrada e reutilização. Verificações estáticas: `git diff --check`; estrutura de 35 módulos; assinaturas dos 10 membros de `IStream` nos quatro implementadores; 19 suítes registradas e despachadas; 41 assertions no fonte da suíte nova e 62 na suíte anterior, preservada sem alteração. **NOT RUN:** não houve compilação ou execução Excel/VBA desta nova revisão nesta sessão. O relato de `r5` acima não valida `r6` ou `clsFileDescriptorTable-r2`.
