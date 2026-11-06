@@ -29,4 +29,4 @@ As linhas `STR-GAP-*` indicam cobertura ausente ou parcial conforme descrito em 
 
 ## Identificação de versão
 
-Todo relatório gerado pelo runner identifica o checkout (quando disponível), as revisões dos módulos carregados e inclui detalhes de falha com número da assertion por suíte. Numeração de assertions só é comparável dentro da mesma revisão de `VBAshTests`; a execução informada anteriormente usou `VBAshTests-r3`, enquanto a suíte nova está no runner `VBAshTests-r4`. Isso não prova qual checkout originou módulos carregados em execuções anteriores. Detalhes em `docs/test-reports/README.md`.
+Todo relatório gerado pelo runner identifica o checkout (quando disponível), as revisões dos módulos carregados e inclui detalhes de falha com número da assertion por suíte. Numeração de assertions só é comparável dentro da mesma revisão de `VBAshTests`; a execução informada anteriormente usou `VBAshTests-r3`, enquanto a suíte nova está no runner `VBAshTests-r5`. Isso não prova qual checkout originou módulos carregados em execuções anteriores. Detalhes em `docs/test-reports/README.md`.
