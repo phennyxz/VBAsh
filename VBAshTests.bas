@@ -1,4 +1,4 @@
-' @VBAshRevision VBAshTests-r4
+' @VBAshRevision VBAshTests-r5
 Option Explicit
 
 Private mAssertions As Long
@@ -13,7 +13,7 @@ Private mLastAssertNumber As Long
 Private mLastAssertDescription As String
 Private mFailExpected As String
 Private mFailActual As String
-Private Const RUNNER_REVISION As String = "VBAshTests-r4"
+Private Const RUNNER_REVISION As String = "VBAshTests-r5"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
@@ -1613,7 +1613,8 @@ Private Sub TestFileDescriptorTable()
 
     Set replacementStream = New clsMemoryStream
     replacementStream.Initialize "closed", True, False
-    replacementStream.CloseStream
+    Set stream = replacementStream
+    stream.CloseStream
     table.SetDescriptor 13, replacementStream
     AssertTrue table.HasDescriptor(13), "a descriptor can reference an already closed stream"
     Set stream = table.GetDescriptor(13)

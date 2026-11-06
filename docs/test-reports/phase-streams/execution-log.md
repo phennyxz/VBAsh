@@ -191,3 +191,7 @@ O usuário informou que todas as demais suítes passaram. Nenhuma saída origina
 | Verificações estáticas | PASS: `git diff --check`; auditoria estrutural de 35 módulos VBA; tags e propriedades de revisão consistentes quando presentes; 18 suítes registradas, despachadas e esperadas; 62 assertions presentes no fonte da nova suíte. Nenhuma compilação VBA é alegada. |
 
 A tabela não cria streams padrão implicitamente e ainda não está integrada a `clsSession`, executor, redirecionamentos ou pipes. Os resultados históricos de execução não foram alterados; em particular, o relatório informado de `VBAshTests-r3` não valida esta nova suíte.
+
+## Correção de compilação em `TestFileDescriptorTable` — 2026-11-06
+
+Erro de compilação reportado no Excel: `replacementStream.CloseStream` em `VBAshTests.bas`. `clsMemoryStream` implementa o membro como `Private Sub IStream_CloseStream()`, acessível apenas por referência `IStream`. O teste agora atribui `replacementStream` à variável `stream` (`IStream`) e chama `CloseStream` por ela; a visibilidade em `clsMemoryStream` não foi alterada. Inspeção estática das demais chamadas a membros de `IStream` em variáveis de classes concretas: nenhuma outra incompatível (`clsFileStream` expõe `ReadText`/`WriteText`/`CloseStream` públicos legados). Runner avançou para `VBAshTests-r5`. Verificação apenas estática; compilação e execução no Excel continuam pendentes.
