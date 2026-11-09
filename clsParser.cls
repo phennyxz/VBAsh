@@ -156,7 +156,7 @@ Private Function ParseSimpleCommand() As clsCommand
                         node.AddArg token.Value
                     End If
                 End If
-            Case "REDIR_OUT", "REDIR_APPEND", "REDIR_ERR", "REDIR_ERR_APPEND"
+            Case "REDIR_OUT", "REDIR_APPEND", "REDIR_ERR", "REDIR_ERR_APPEND", "REDIR_IN"
                 If expectsTarget Then
                     Err.Raise vbObjectError + 1005, "clsParser.ParseAst", _
                         "Destino de redirecionamento ausente."
