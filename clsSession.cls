@@ -23,7 +23,7 @@ Private mStandardError As clsConsoleStream
 Private mPendingDescriptorScope As clsDescriptorScope
 
 Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsSession-r4"
+    ModuleRevision = "clsSession-r5"
 End Property
 
 
