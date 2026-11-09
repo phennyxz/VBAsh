@@ -486,10 +486,6 @@ Private Function ReadModuleProperty(ByVal moduleName As String) As String
             Dim resolvedCommand As clsResolvedCommand
             Set resolvedCommand = New clsResolvedCommand
             ReadModuleProperty = resolvedCommand.ModuleRevision
-        Case "clsBuiltinRegistry"
-            Dim builtinRegistry As clsBuiltinRegistry
-            Set builtinRegistry = New clsBuiltinRegistry
-            ReadModuleProperty = builtinRegistry.ModuleRevision
     End Select
 Done:
 End Function
