@@ -1,3 +1,4 @@
+' @VBAshRevision clsTokenizer-r2
 Option Explicit
 
 Private mSource As String
