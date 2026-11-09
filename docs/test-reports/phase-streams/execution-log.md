@@ -216,7 +216,8 @@ O usuário informou execução real em Excel/VBA de `VBAshTests-r5`: 18/18 suít
 | Suítes registradas | 23 |
 | Execução Excel/VBA nesta revisão | NOT RUN |
 | Compilação VBA nesta revisão | NOT RUN |
-| Commit de implementação | Sequência de commits na branch; confirmar HEAD no GitHub antes da importação |
+| HEAD da branch no momento desta revisão | `590ee89d89fc19d13a37c097c43774c1f64654a6` |
+| Commit SHA testado | Não aplicável — ainda não houve compilação nem execução Excel/VBA |
 | Resultado funcional | Pendente |
 
 A fonte inclui escopos de descritores, gerenciador de redirecionamentos, adaptadores de captura para stdout/stderr, stream nulo para stdin, buffer de pipe e integração com a sessão. Também inclui testes de escopos, redirecionamento integrado, console e pipe. Foram feitas apenas inspeções estáticas nesta sessão; nenhuma execução VBA foi realizada e nenhum resultado PASS é declarado.
