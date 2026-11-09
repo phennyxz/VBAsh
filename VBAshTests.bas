@@ -2994,12 +2994,12 @@ Private Sub TestCommandResolver()
     Set functionBody = New clsCommand
     functionBody.Init "echo", "echo function-body"
     functionBody.AddArg "function-body"
-    session.RegisterFunction "echo", functionBody
+    resolver.RegisterFunction "echo", functionBody
     source.Init "echo", "echo builtin"
     Set resolved = resolver.ResolveCommand(source, session)
     AssertEqual "FUNCTION", resolved.CommandType, "registered function takes precedence over builtin"
     AssertTrue resolved.FunctionBody Is functionBody, "resolved function retains its AST body"
-    AssertTrue session.RemoveFunction("echo"), "session removes a registered function"
+    AssertTrue resolver.RemoveFunction("echo"), "resolver removes a registered function"
 
     source.Init "echo", "echo builtin"
     Set resolved = resolver.ResolveCommand(source, session)
