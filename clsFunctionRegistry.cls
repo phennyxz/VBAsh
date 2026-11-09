@@ -39,6 +39,7 @@ Public Function HasFunction(ByVal functionName As String) As Boolean
 End Function
 
 Public Function Resolve(ByVal functionName As String) As clsCommand
+    functionName = Trim$(functionName)
     If mFunctions.Exists(functionName) Then
         Set Resolve = mFunctions(functionName)
     End If
