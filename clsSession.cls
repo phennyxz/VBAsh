@@ -1,4 +1,4 @@
-' @VBAshRevision clsSession-r5
+' @VBAshRevision clsSession-r6
 Option Explicit
 
 Public CurrentDirectory As String
@@ -23,7 +23,7 @@ Private mStandardError As clsConsoleStream
 Private mPendingDescriptorScope As clsDescriptorScope
 
 Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsSession-r5"
+    ModuleRevision = "clsSession-r6"
 End Property
 
 
@@ -78,6 +78,14 @@ End Function
 Public Function RemoveAlias(ByVal aliasName As String) As Boolean
     RemoveAlias = mAliasRegistry.RemoveAlias(aliasName)
 End Function
+
+Public Function GetAliasNames() As Collection
+    Set GetAliasNames = mAliasRegistry.GetAliasNames()
+End Function
+
+Public Sub ClearAliases()
+    mAliasRegistry.ClearAliases
+End Sub
 
 Private Function ExpandAliasTokens(ByVal tokens As Collection) As Collection
     Dim expander As clsAliasExpander
