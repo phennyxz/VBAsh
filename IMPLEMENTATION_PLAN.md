@@ -199,6 +199,18 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 - Aliases, funções e descoberta de executáveis continuam pendentes; a prioridade completa de resolução ainda não está implementada.
 - A suíte `CommandResolver` foi adicionada ao runner `VBAshTests-r10`; a validação de compilação e execução no Excel/VBA depende da importação e do relatório do usuário.
 
+### Integração de aliases — Fase 4D
+
+- clsAliasRegistry mantém nomes e textos de substituição em um dicionário case-sensitive; duplicatas exigem substituição explícita.
+- clsAliasExpander opera sobre tokens antes do parser, reutiliza clsTokenizer e não modifica a coleção de entrada nem a AST.
+- A expansão ocorre somente em palavras de comando não citadas, incluindo posições após ;, |, &&, || e após palavras de atribuição NOME=valor.
+- Palavras de argumentos e destinos de redirecionamento não são expandidos. Redirecionamentos anteriores ao nome do comando são aceitos pelo parser para permitir > arquivo alias.
+- O texto de substituição pode introduzir várias palavras; os argumentos originais permanecem depois dos tokens introduzidos.
+- A recursão é protegida por uma pilha de aliases ativos e limite de profundidade. Auto-referências e ciclos terminam emitindo literalmente o alias já ativo, evitando expansão infinita.
+- A sessão expõe RegisterAlias, HasAlias, GetAlias e RemoveAlias. Não há ainda builtin alias/unalias, aliases com valor terminado em espaço, funções, comandos externos ou execução de pipelines.
+- A expansão lexical de NOME=valor permite reconhecer o próximo nome de comando para alias, mas a semântica de atribuições prefixadas ainda não foi implementada no parser/executor.
+- A suíte AliasExpansion cobre registry, expansão em posições de comando, argumentos, operadores, redirecionamentos, aspas, atribuições prefixadas, aliases vazios, auto-referência/ciclos e integração com a sessão. A validação no Excel/VBA ainda depende da importação e execução do runner atualizado.
+
 ### Critérios de conclusão
 - O shell consegue classificar um comando em uma de várias categorias.
 - O registry resolve a prioridade correta:
