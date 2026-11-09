@@ -209,15 +209,12 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 - A recursão é protegida por uma pilha de aliases ativos e limite de profundidade. Auto-referências e ciclos terminam emitindo literalmente o alias já ativo, evitando expansão infinita.
 - A sessão expõe RegisterAlias, HasAlias, GetAlias e RemoveAlias. Não há ainda builtin alias/unalias, aliases com valor terminado em espaço, funções, comandos externos ou execução de pipelines.
 - A expansão lexical de NOME=valor permite reconhecer o próximo nome de comando para alias, mas a semântica de atribuições prefixadas ainda não foi implementada no parser/executor.
-- A suíte AliasExpansion cobre registry, expansão em posições de comando, argumentos, operadores, redirecionamentos, aspas, atribuições prefixadas, aliases vazios, auto-referência/ciclos e integração com a sessão. A validação no Excel/VBA ainda depende da importação e execução do runner atualizado.
+- A suíte AliasExpansion foi adicionada ao runner VBAshTests-r11 e cobre registry, expansão em posições de comando, argumentos, operadores, redirecionamentos, aspas, atribuições prefixadas, aliases vazios, auto-referência/ciclos e integração com a sessão. A validação no Excel/VBA ainda depende da importação e execução do runner atualizado.
 
 ### Critérios de conclusão
 - O shell consegue classificar um comando em uma de várias categorias.
-- O registry resolve a prioridade correta:
-  1. alias
-  2. função
-  3. builtin
-  4. executável externo
+- A expansão lexical de aliases ocorre antes da AST e, portanto, antes da resolução de comandos.
+- A resolução pós-AST deverá respeitar a prioridade entre função, builtin e executável externo.
 - Comandos sem nome não são aceitos.
 - O objeto CCommand armazena nome, Args, redireções, contexto e tipo.
 - A resolução é separada da execução.
