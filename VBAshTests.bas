@@ -1599,6 +1599,13 @@ Private Sub TestDescriptorRedirection()
     Dim path As String
     Dim result As String
     Dim contents As String
+    Dim inputPath As String
+    Dim inputFile As Object
+    Dim redirection As clsRedirection
+    Dim redirections As Collection
+    Dim manager As clsRedirectionManager
+    Dim scope As clsDescriptorScope
+    Dim inputStream As IStream
 
     Set session = New clsSession
     Set table = New clsFileDescriptorTable
@@ -1613,6 +1620,24 @@ Private Sub TestDescriptorRedirection()
 
     Set fileSystem = CreateObject("Scripting.FileSystemObject")
     path = fileSystem.BuildPath(fileSystem.GetSpecialFolder(2), fileSystem.GetTempName)
+    inputPath = fileSystem.BuildPath(fileSystem.GetSpecialFolder(2), fileSystem.GetTempName)
+    Set inputFile = fileSystem.CreateTextFile(inputPath, True)
+    inputFile.Write "input-data"
+    inputFile.Close
+
+    Set redirections = New Collection
+    Set redirection = New clsRedirection
+    redirection.Operator = "REDIR_IN"
+    redirection.Target = inputPath
+    redirections.Add redirection
+    Set manager = New clsRedirectionManager
+    Set scope = table.BeginDescriptorScope
+    manager.ApplyRedirections table, scope, redirections, session.CurrentDirectory
+    Set inputStream = table.GetDescriptor(0)
+    AssertTrue inputStream.CanRead, "input redirection installs a readable FD 0 stream"
+    AssertEqual "input-data", inputStream.ReadText(32), "input redirection reads file content through FD 0"
+    table.RestoreDescriptorScope scope
+
     result = session.ProcessInput("echo descriptor > """ & path & """")
     AssertEqual 0, session.LastExitCode, "descriptor redirection executes builtin successfully"
     AssertTrue Not session.HasOutput, "file redirection suppresses console output"
@@ -1674,6 +1699,7 @@ Private Sub TestDescriptorRedirection()
                 "stdout then stderr duplication writes stderr to the opened stdout file"
 
     fileSystem.DeleteFile path, True
+    fileSystem.DeleteFile inputPath, True
     table.CloseAll
 End Sub
 
