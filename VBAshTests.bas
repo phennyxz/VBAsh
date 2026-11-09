@@ -1613,6 +1613,28 @@ Private Sub TestDescriptorRedirection()
     AssertTrue session.HasErrorOutput, "stdout-to-stderr duplication is visible on stderr channel"
     AssertEqual "routed", session.ErrorOutput, "stdout-to-stderr duplication preserves output text"
 
+    table.SetDescriptor 3, stdoutStream
+    result = session.ProcessInput("echo duplicated 1>&3")
+    AssertEqual "duplicated", result, "multi-digit-capable descriptor duplication routes stdout through FD 3"
+    result = session.ProcessInput("echo retained 3>&-")
+    AssertEqual "retained", result, "closing a nonstandard descriptor leaves stdout operational"
+    AssertTrue table.HasDescriptor(3), "scope restores a descriptor closed during command execution"
+
+    result = session.ProcessInput("pwd extra 2>&1 > """ & path & """")
+    AssertEqual 2, session.LastExitCode, "ordered descriptor redirection preserves command status"
+    AssertTrue session.HasOutput, "stderr duplicated before stdout redirect remains visible on original stdout"
+    AssertTrue Not session.HasErrorOutput, "ordered stderr duplication is not shown on stderr channel"
+    contents = ReadRedirectedFile(fileSystem, path, "", "ordered descriptor redirection")
+    AssertEqual "", contents, "later stdout redirect creates an empty file"
+
+    result = session.ProcessInput("pwd extra > """ & path & """ 2>&1")
+    AssertTrue Not session.HasOutput And Not session.HasErrorOutput, _
+               "stdout then stderr duplication routes both channels to file"
+    contents = ReadRedirectedFile(fileSystem, path, "VBAsh: Uso: pwd" & vbCrLf, _
+                                  "stdout then stderr duplication")
+    AssertEqual "VBAsh: Uso: pwd" & vbCrLf, contents, _
+                "stdout then stderr duplication writes stderr to the opened stdout file"
+
     fileSystem.DeleteFile path, True
     table.CloseAll
 End Sub
