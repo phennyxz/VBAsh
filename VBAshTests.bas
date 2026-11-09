@@ -1,4 +1,4 @@
-' @VBAshRevision VBAshTests-r7
+' @VBAshRevision VBAshTests-r8
 Option Explicit
 
 Private mAssertions As Long
@@ -13,11 +13,11 @@ Private mLastAssertNumber As Long
 Private mLastAssertDescription As String
 Private mFailExpected As String
 Private mFailActual As String
-Private Const RUNNER_REVISION As String = "VBAshTests-r7"
+Private Const RUNNER_REVISION As String = "VBAshTests-r8"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
-Private Const EXPECTED_TEST_COUNT As Long = 23
+Private Const EXPECTED_TEST_COUNT As Long = 24
 
 Public Sub VBAsh_RunTests()
     Dim startedAt As Date
@@ -60,6 +60,7 @@ Public Sub VBAsh_RunTests()
     RunTest "DescriptorRedirection"
     RunTest "ConsoleStream"
     RunTest "PipeStream"
+    RunTest "ResolvedCommand"
 
     finishedAt = Now
     summary = TestRunSummary()
@@ -121,6 +122,7 @@ Private Sub RunTest(ByVal testName As String)
         Case "DescriptorRedirection": TestDescriptorRedirection
         Case "ConsoleStream": TestConsoleStream
         Case "PipeStream": TestPipeStream
+        Case "ResolvedCommand": TestResolvedCommand
         Case Else
             Err.Raise vbObjectError + 1102, "VBAshTests.RunTest", _
                       "Teste não registrado: " & testName
@@ -351,7 +353,7 @@ Private Function LoadedModuleReport(ByRef warnings As String, ByRef unverifiedCo
     names = Array("VBAsh", "VBAshTests", "IStream", "clsSession", "clsTokenizer", _
                   "clsParser", "clsFileStream", "clsMemoryStream", _
                   "clsNullStream", "clsFileDescriptorTable", "clsDescriptorScope", _
-                  "clsDescriptorScopeEntry", "clsRedirectionManager", "clsConsoleStream", "clsPipeStream")
+                  "clsDescriptorScopeEntry", "clsRedirectionManager", "clsConsoleStream", "clsPipeStream", "clsResolvedCommand")
     For index = LBound(names) To UBound(names)
         tag = ReadModuleTag(CStr(names(index)))
         prop = ReadModuleProperty(CStr(names(index)))
@@ -447,6 +449,10 @@ Private Function ReadModuleProperty(ByVal moduleName As String) As String
             Dim pipeStream As clsPipeStream
             Set pipeStream = New clsPipeStream
             ReadModuleProperty = pipeStream.ModuleRevision
+        Case "clsResolvedCommand"
+            Dim resolvedCommand As clsResolvedCommand
+            Set resolvedCommand = New clsResolvedCommand
+            ReadModuleProperty = resolvedCommand.ModuleRevision
     End Select
 Done:
 End Function
@@ -2841,6 +2847,60 @@ ReadError:
         "; exists: " & CStr(fileExists) & _
         "; size: " & CStr(fileSize) & " bytes; original source: " & errorSource & ")"
 End Function
+
+Private Sub TestResolvedCommand()
+    Dim command As clsResolvedCommand
+    Dim session As clsSession
+    Dim redirection As clsRedirection
+    Dim errorNumber As Long
+
+    Set session = New clsSession
+    Set command = New clsResolvedCommand
+
+    AssertEqual 0, command.Args.Count, "new resolved command initializes an empty argument collection"
+    AssertEqual 0, command.Redirections.Count, "new resolved command initializes an empty redirection collection"
+
+    command.Init "echo", "builtin", session
+    AssertEqual "echo", command.Name, "resolved command stores its name"
+    AssertEqual "BUILTIN", command.CommandType, "resolved command normalizes its type"
+    AssertTrue command.Context Is session, "resolved command retains its session context"
+    AssertEqual 0, command.Args.Count, "initialization resets arguments"
+    AssertEqual 0, command.Redirections.Count, "initialization resets redirections"
+
+    command.AddArgument "hello"
+    command.AddArgument "world"
+    AssertEqual 2, command.Args.Count, "resolved command stores arguments in order"
+    AssertEqual "hello", CStr(command.Args(1)), "resolved command preserves first argument"
+    AssertEqual "world", CStr(command.Args(2)), "resolved command preserves second argument"
+
+    Set redirection = New clsRedirection
+    redirection.Operator = ">"
+    redirection.Target = "out.txt"
+    command.AddRedirection redirection
+    AssertEqual 1, command.Redirections.Count, "resolved command stores redirections"
+    AssertTrue command.Redirections(1) Is redirection, "resolved command preserves redirection identity"
+
+    command.Init "myalias", "alias", session
+    AssertEqual "ALIAS", command.CommandType, "alias type is accepted"
+    AssertEqual 0, command.Args.Count, "reinitialization clears prior arguments"
+    AssertEqual 0, command.Redirections.Count, "reinitialization clears prior redirections"
+
+    On Error Resume Next
+    Err.Clear
+    command.Init "", "BUILTIN", session
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual vbObjectError + 1300, errorNumber, "empty command name is rejected"
+
+    On Error Resume Next
+    Err.Clear
+    command.Init "echo", "UNKNOWN", session
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual vbObjectError + 1301, errorNumber, "unsupported command type is rejected"
+End Sub
 
 Private Sub AssertEqual(ByVal expected As Variant, ByVal actual As Variant, ByVal description As String)
     mAssertions = mAssertions + 1
