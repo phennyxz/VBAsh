@@ -1,4 +1,4 @@
-' @VBAshRevision VBAshTests-r10
+' @VBAshRevision VBAshTests-r11
 Option Explicit
 
 Private mAssertions As Long
@@ -13,7 +13,7 @@ Private mLastAssertNumber As Long
 Private mLastAssertDescription As String
 Private mFailExpected As String
 Private mFailActual As String
-Private Const RUNNER_REVISION As String = "VBAshTests-r10"
+Private Const RUNNER_REVISION As String = "VBAshTests-r11"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
@@ -943,6 +943,8 @@ End Sub
 
 Private Sub TestForLoops()
     Dim session As clsSession
+    Dim parser As clsParser
+    Dim ast As clsCommand
 
     Set session = New clsSession
     AssertEqual "1" & vbCrLf & "2" & vbCrLf & "3", _
@@ -3130,6 +3132,10 @@ Private Sub TestAliasExpansion()
                 "leading redirection target is preserved"
     AssertEqual "echo", CStr(expanded(3).Value), _
                 "command after leading redirection is alias-expanded"
+    Set parser = New clsParser
+    Set ast = parser.ParseAst(expanded, "> arquivo ll")
+    AssertEqual "echo", ast.Name, "parser accepts a command after a leading redirection"
+    AssertEqual 1, ast.Redirections.Count, "leading redirection remains attached to the command"
 
     Set tokens = tokenizer.Tokenize("'ll'")
     Set expanded = expander.ExpandTokens(tokens, registry)
@@ -3153,6 +3159,13 @@ Private Sub TestAliasExpansion()
                 "recursive self-reference is emitted literally"
     AssertEqual "--flag", CStr(expanded(2).Value), _
                 "self-referential alias still contributes its remaining words"
+
+    registry.RegisterAlias "short", "ll -n"
+    Set tokens = tokenizer.Tokenize("short tail")
+    Set expanded = expander.ExpandTokens(tokens, registry)
+    AssertEqual "echo", CStr(expanded(1).Value), "aliases can expand through another alias"
+    AssertEqual "fixed", CStr(expanded(3).Value), "nested alias expansion retains replacement arguments"
+    AssertEqual "tail", CStr(expanded(4).Value), "nested alias expansion preserves original arguments"
 
     registry.RegisterAlias "cycle-a", "cycle-b"
     registry.RegisterAlias "cycle-b", "cycle-a"
