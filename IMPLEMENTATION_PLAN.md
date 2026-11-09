@@ -272,35 +272,56 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 
 ## Fase 5 — Lexer
 
-### Objetivo
-Implementar a análise léxica do shell, convertendo texto em tokens compreensíveis para o parser.
+### Estado no snapshot de referência (2026-11-09)
+Esta fase **não começa do zero**. O repositório já contém uma implementação funcional de clsTokenizer-r2, clsToken e clsWordSegment, integrada ao parser e à expansão de aliases. O runner VBAshTests-r14 já executou as suítes Tokenizer (25 asserções) e TokenizerWordSegments (41 asserções), ambas PASS no relatório informado pelo usuário.
 
-### Módulos envolvidos
-- CTokenizer
-- CToken
-- CTokenType
-- CStringScanner
-- CQuoteState
-- CEscapeHandler
+A atividade pendente é uma **auditoria de contrato e endurecimento lexical**, seguida de correções pontuais justificadas por requisitos e testes. Não criar uma segunda classe Lexer nem introduzir CStringScanner, CQuoteState ou CEscapeHandler sem uma necessidade demonstrada.
+
+### Objetivo
+Consolidar o contrato lexical entre clsTokenizer, os tokens/segmentos produzidos e clsParser, preservando os metadados necessários às etapas posteriores sem executar expansões ou semântica de comandos.
+
+### Implementação existente
+- clsTokenizer.Tokenize(sourceText) As Collection é o ponto de entrada público.
+- clsToken representa tipo, valor, máscara de expansão, permissão de brace expansion, segmentos e offsets de origem.
+- clsWordSegment preserva texto, contexto de aspas, escape e offsets de origem.
+- São reconhecidos palavras, comentários, operadores lógicos, pipe, separador, redirecionamentos, descritores, parênteses, EOF e erros de aspas não fechadas.
+- A implementação já preserva fragmentos adjacentes de palavras e contexto de aspas para a etapa de expansão.
+
+### Escopo da auditoria
+1. Documentar a gramática lexical efetivamente suportada, separando comportamento implementado de compatibilidade Bash ainda não suportada.
+2. Verificar barra invertida no fim da entrada e definir o comportamento esperado para entrada incompleta.
+3. Definir e testar continuação de linha escapada em LF e CRLF, sem confundir com escape literal.
+4. Revisar limites de aspas simples/duplas, fragmentos vazios, segmentos adjacentes e offsets de origem.
+5. Verificar comentários no início de palavra e # dentro de palavras.
+6. Preservar $VAR, ${VAR}, máscara de expansão e contexto de aspas; o lexer não executa expansão.
+7. Definir a fronteira entre { e } como sintaxe e brace expansion; não transformar chaves em delimitadores sem avaliar o impacto em {1..7} e no parser atual.
+8. Revisar maximal munch e precedência lexical dos operadores/redirecionamentos, incluindo descritores genéricos.
+9. Definir como erros lexicais são reportados e se existe estado de entrada incompleta para uso interativo, sem misturar isso com a execução de scripts.
 
 ### Dependências
-- Fases 1 a 4 concluídas
-- O shell já deve receber texto e produzir um comando bruto
+- clsParser e o contrato atual de clsToken.
+- clsAliasExpander, que consome os tokens antes do parser.
+- Runner VBAshTests e execução de regressão no Excel/VBA.
 
 ### Critérios de conclusão
-- O lexer reconhece tokens básicos: palavras, operadores, pipes, redirecionadores, parênteses e comentários.
-- Aspas simples e duplas são tratadas corretamente.
-- Escape de caracteres funciona.
-- Tokens de variáveis e expansão são preservados corretamente para a etapa de parser/expander.
-- O lexer identifica `|`, `>`, `<`, `&&`, `||`, `;`, `(`, `)`, `{`, `}`.
+- O contrato público Tokenize(sourceText) As Collection permanece estável ou qualquer mudança é coordenada com parser, alias expander e testes.
+- A gramática suportada e as limitações ficam documentadas.
+- Cada lacuna identificada tem teste reproduzível antes da correção.
+- Casos de LF/CRLF, escape final, aspas, comentários, expansão preservada, brace expansion, operadores e offsets têm resultados explícitos.
+- Nenhuma expansão de variável, resolução de comando ou construção de AST é executada pelo tokenizer.
+- As suítes lexicais e toda a regressão do runner passam no Excel/VBA, com revisões de módulos e identidade do checkout registradas.
 
 ### Testes mínimos
-- Teste 1: `echo hello` produz 3 tokens.
-- Teste 2: `echo "hello world"` produz 2 tokens, com palavra preservada com espaço.
-- Teste 3: `echo 'a b'` mantém o valor literal.
-- Teste 4: `echo hello\ world` trata escape corretamente.
-- Teste 5: `echo foo | grep foo` produz tokens de pipe corretamente.
-- Teste 6: `echo hi # comment` ignora comentário corretamente.
+- Preservar os testes existentes TestTokenizer e TestTokenizerWordSegments.
+- echo hello, aspas simples/duplas, palavras com segmentos adjacentes e aspas vazias.
+- Escape de espaço, operador, cifrão e barra invertida; barra invertida terminal.
+- Continuação de linha LF e CRLF.
+- Comentários em início de palavra e # no interior de palavra.
+- &&, ||, |, ;, parênteses e redirecionamentos, inclusive 2>&1, n>&m e n>&-.
+- $VAR e ${VAR} preservados com máscaras e contexto de aspas corretos.
+- {1..7} e chaves em palavras quoted/escaped sem regressão.
+- Offsets de token e segmento em texto com espaços, escapes e aspas.
+- Erros de aspas não fechadas e entradas lexicalmente incompletas.
 
 ---
 
@@ -574,11 +595,10 @@ Este plano foi desenhado para evoluir de forma incremental, sem overengineering 
 
 
 
-### Implementação de interface de aliases — Fase 4E (em validação)
+### Estado atual da Fase 4 — referência consolidada (2026-11-09)
 
-- `clsBuiltinAlias` e `clsBuiltinUnalias` conectam a sintaxe de terminal ao registry da sessão.
-- `alias NOME=VALOR` cria ou substitui; `alias NOME` consulta; `alias` lista. `unalias NOME` remove e `unalias -a` limpa todos.
-- O registry e a sessão expõem enumeração e limpeza; o instalador inclui os dois novos módulos na lista de limpeza legada.
-- O runner `VBAshTests-r12` acrescenta `AliasBuiltins`, incluindo fluxo real por `ProcessInput`.
-- A implementação ainda precisa ser importada/compilada e executada no Excel/VBA; só então a Fase 4 poderá ser fechada funcionalmente.
+A validação mais recente registrada está em docs/test-reports/phase-4-command-registry-r14.md: runner VBAshTests-r14, 29/29 suítes PASS e 969 asserções. O relatório identifica as revisões dos módulos carregados, mas não identifica o SHA/branch do checkout do workbook; a correspondência checkout/módulos permanece UNVERIFIED.
 
+O registro anterior de Fase 4E como “em validação” foi superado por essa execução. A aprovação cobre registro e resolução/classificação de aliases, funções e comandos externos; **não** significa que funções ou processos externos sejam executados.
+
+Consulte docs/PROJECT_STATUS.md para o estado consolidado e docs/BRANCH_STATUS.md para a fotografia das branches.
