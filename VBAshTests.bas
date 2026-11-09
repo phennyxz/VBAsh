@@ -1,4 +1,4 @@
-' @VBAshRevision VBAshTests-r6
+' @VBAshRevision VBAshTests-r7
 Option Explicit
 
 Private mAssertions As Long
@@ -13,11 +13,11 @@ Private mLastAssertNumber As Long
 Private mLastAssertDescription As String
 Private mFailExpected As String
 Private mFailActual As String
-Private Const RUNNER_REVISION As String = "VBAshTests-r6"
+Private Const RUNNER_REVISION As String = "VBAshTests-r7"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
-Private Const EXPECTED_TEST_COUNT As Long = 19
+Private Const EXPECTED_TEST_COUNT As Long = 21
 
 Public Sub VBAsh_RunTests()
     Dim startedAt As Date
@@ -56,6 +56,8 @@ Public Sub VBAsh_RunTests()
     RunTest "FileStream"
     RunTest "FileDescriptorTable"
     RunTest "FileDescriptorTableCloseAll"
+    RunTest "DescriptorScopes"
+    RunTest "DescriptorRedirection"
 
     finishedAt = Now
     summary = TestRunSummary()
@@ -113,6 +115,8 @@ Private Sub RunTest(ByVal testName As String)
         Case "FileStream": TestFileStream
         Case "FileDescriptorTable": TestFileDescriptorTable
         Case "FileDescriptorTableCloseAll": TestFileDescriptorTableCloseAll
+        Case "DescriptorScopes": TestDescriptorScopes
+        Case "DescriptorRedirection": TestDescriptorRedirection
         Case Else
             Err.Raise vbObjectError + 1102, "VBAshTests.RunTest", _
                       "Teste não registrado: " & testName
@@ -341,7 +345,8 @@ Private Function LoadedModuleReport(ByRef warnings As String, ByRef unverifiedCo
     Dim note As String
 
     names = Array("VBAshTests", "IStream", "clsFileStream", "clsMemoryStream", _
-                  "clsNullStream", "clsFileDescriptorTable")
+                  "clsNullStream", "clsFileDescriptorTable", "clsDescriptorScope", _
+                  "clsDescriptorScopeEntry", "clsRedirectionManager")
     For index = LBound(names) To UBound(names)
         tag = ReadModuleTag(CStr(names(index)))
         prop = ReadModuleProperty(CStr(names(index)))
@@ -1452,6 +1457,103 @@ Private Sub TestStreamContract()
     AssertTrue stream.HasError, "operation on a closed stream records error state"
     AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, _
                 "closed-stream error has its distinct code"
+End Sub
+
+Private Sub TestDescriptorScopes()
+    Dim table As clsFileDescriptorTable
+    Dim stdinStream As clsMemoryStream
+    Dim stdoutStream As clsMemoryStream
+    Dim stderrStream As clsMemoryStream
+    Dim originalStream As clsMemoryStream
+    Dim temporaryStream As clsMemoryStream
+    Dim scope As clsDescriptorScope
+    Dim nestedScope As clsDescriptorScope
+    Dim stream As IStream
+    Dim errorNumber As Long
+
+    Set table = New clsFileDescriptorTable
+    Set stdinStream = New clsMemoryStream
+    stdinStream.Initialize "", True, False
+    Set stdoutStream = New clsMemoryStream
+    stdoutStream.Initialize "", False, True
+    Set stderrStream = New clsMemoryStream
+    stderrStream.Initialize "", False, True
+    table.Initialize stdinStream, stdoutStream, stderrStream
+
+    Set originalStream = New clsMemoryStream
+    originalStream.Initialize "original", True, True
+    table.SetDescriptor 3, originalStream, True
+    Set scope = table.BeginDescriptorScope
+
+    Set temporaryStream = New clsMemoryStream
+    temporaryStream.Initialize "temporary", True, True
+    table.SetDescriptor 3, temporaryStream, True
+    table.SetDescriptor 4, temporaryStream, True
+
+    On Error Resume Next
+    table.CloseAll
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertTrue errorNumber <> 0, "CloseAll rejects active descriptor scopes"
+    AssertTrue Not originalStream.IsClosed, "snapshot pins preserve the original owned stream"
+
+    Set nestedScope = table.BeginDescriptorScope
+    On Error Resume Next
+    table.RestoreDescriptorScope scope
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertTrue errorNumber <> 0, "outer scope cannot be restored before inner scope"
+
+    table.RestoreDescriptorScope nestedScope
+    table.RestoreDescriptorScope scope
+    Set stream = table.GetDescriptor(3)
+    AssertTrue stream Is originalStream, "scope restores original descriptor identity"
+    AssertTrue originalStream.CanRead, "restored original stream remains usable"
+    AssertTrue temporaryStream.IsClosed, "owned temporary stream closes after restoration"
+    AssertTrue Not table.HasDescriptor(4), "descriptor created inside scope is removed"
+End Sub
+
+Private Sub TestDescriptorRedirection()
+    Dim session As clsSession
+    Dim table As clsFileDescriptorTable
+    Dim stdinStream As clsNullStream
+    Dim stdoutStream As clsMemoryStream
+    Dim stderrStream As clsMemoryStream
+    Dim fileSystem As Object
+    Dim path As String
+    Dim result As String
+    Dim contents As String
+
+    Set session = New clsSession
+    Set table = New clsFileDescriptorTable
+    Set stdinStream = New clsNullStream
+    stdinStream.Initialize True, False
+    Set stdoutStream = New clsMemoryStream
+    stdoutStream.Initialize "", True, True
+    Set stderrStream = New clsMemoryStream
+    stderrStream.Initialize "", True, True
+    table.Initialize stdinStream, stdoutStream, stderrStream, True
+    session.ConfigureDescriptorTable table, stdoutStream, stderrStream
+
+    Set fileSystem = CreateObject("Scripting.FileSystemObject")
+    path = fileSystem.BuildPath(fileSystem.GetSpecialFolder(2), fileSystem.GetTempName)
+    result = session.ProcessInput("echo descriptor > """ & path & """")
+    AssertEqual 0, session.LastExitCode, "descriptor redirection executes builtin successfully"
+    AssertTrue Not session.HasOutput, "file redirection suppresses console output"
+    contents = ReadRedirectedFile(fileSystem, path, "descriptor" & vbCrLf, _
+                                  "descriptor-based stdout")
+    AssertEqual "descriptor" & vbCrLf, contents, "descriptor manager writes stdout to file"
+
+    result = session.ProcessInput("pwd extra 2> """ & path & """")
+    AssertEqual 2, session.LastExitCode, "descriptor stderr redirection preserves builtin status"
+    AssertTrue Not session.HasErrorOutput, "redirected stderr is not returned to terminal"
+    contents = ReadRedirectedFile(fileSystem, path, "VBAsh: Uso: pwd" & vbCrLf, _
+                                  "descriptor-based stderr")
+    AssertEqual "VBAsh: Uso: pwd" & vbCrLf, contents, "descriptor manager writes stderr to file"
+    fileSystem.DeleteFile path, True
+    table.CloseAll
 End Sub
 
 Private Sub TestFileDescriptorTable()
