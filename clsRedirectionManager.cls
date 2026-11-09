@@ -1,10 +1,10 @@
-' @VBAshRevision clsRedirectionManager-r1
+' @VBAshRevision clsRedirectionManager-r2
 Option Explicit
 
 Private Const REDIRECTION_ERROR As Long = vbObjectError + 1270
 
 Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsRedirectionManager-r1"
+    ModuleRevision = "clsRedirectionManager-r2"
 End Property
 
 ' Applies redirections in lexical order. The caller owns the surrounding
@@ -90,7 +90,7 @@ Private Sub ApplyDescriptorDuplication(ByVal table As clsFileDescriptorTable, _
     Dim destination As Long
     Dim source As Long
     separator = InStr(1, operatorText, ">&", vbBinaryCompare)
-    If separator <= 1 Or separator + 2 >= Len(operatorText) Then
+    If separator <= 1 Or separator + 2 > Len(operatorText) Then
         Err.Raise REDIRECTION_ERROR, "clsRedirectionManager", _
                   "Operador de duplicação de descritor inválido: " & operatorText
     End If
