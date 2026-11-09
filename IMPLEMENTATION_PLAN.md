@@ -224,7 +224,7 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 - `clsCommandResolver-r3` aplica FUNCTION → BUILTIN → EXTERNAL, classifica nós não simples como COMPOUND e mantém UNRESOLVED para nomes não encontrados.
 - `clsResolvedCommand-r2` carrega o corpo AST da função ou caminho do executável. A execução desses dois tipos continua deliberadamente fora desta fase.
 - O instalador inclui os novos módulos; `help` lista os comandos alias/unalias.
-- O runner `VBAshTests-r14` acrescenta `AliasBuiltins` e `FunctionRegistry`, além de ampliar `CommandResolver` para precedência, PATH e COMPOUND.
+- O runner `VBAshTests-r14` acrescenta `AliasBuiltins` e `FunctionRegistry`, além de ampliar `CommandResolver` para precedência, PATH e COMPOUND; o relatório identifica as revisões dos módulos novos e atualizados.
 - Estado: implementação publicada; compilação e execução no Excel/VBA ainda pendentes. A Fase 4 só poderá ser fechada após o runner r13 passar.
 
 ### Critérios de conclusão
@@ -235,7 +235,7 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 - Nós não simples são classificados como COMPOUND; nomes sem correspondência são UNRESOLVED.
 - A resolução externa retorna o caminho encontrado no PATH, mas não executa o processo.
 - Comandos sem nome não são aceitos.
-- O objeto CCommand armazena nome, Args, redireções, contexto e tipo.
+- `clsResolvedCommand` armazena nome, Args, redireções, contexto e tipo resolvido; `clsCommand` continua representando a AST.
 - A resolução é separada da execução.
 
 ### Testes mínimos
