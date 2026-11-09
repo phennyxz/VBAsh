@@ -18,6 +18,7 @@ Private mDescriptorTable As clsFileDescriptorTable
 Private mRedirectionManager As clsRedirectionManager
 Private mStandardOutput As clsConsoleStream
 Private mStandardError As clsConsoleStream
+Private mPendingDescriptorScope As clsDescriptorScope
 
 Private Sub Class_Initialize()
     CurrentDirectory = CurDir$
@@ -45,6 +46,12 @@ Public Sub ConfigureDescriptorTable(ByVal table As clsFileDescriptorTable, _
     Set mStandardOutput = standardOutput
     Set mStandardError = standardError
     Set mRedirectionManager = New clsRedirectionManager
+End Sub
+
+Public Sub RetryPendingDescriptorRestoration()
+    If mDescriptorTable Is Nothing Or mPendingDescriptorScope Is Nothing Then Exit Sub
+    mDescriptorTable.RestoreDescriptorScope mPendingDescriptorScope
+    Set mPendingDescriptorScope = Nothing
 End Sub
 
 Public Sub SetEnv(ByVal key As String, ByVal value As String)
@@ -221,6 +228,11 @@ Private Function ExecuteParsedCommand(ByVal command As clsCommand) As String
     End If
 
     If Not mDescriptorTable Is Nothing Then
+        If Not mPendingDescriptorScope Is Nothing Then
+            On Error GoTo PendingRestoreFailure
+            mDescriptorTable.RestoreDescriptorScope mPendingDescriptorScope
+            Set mPendingDescriptorScope = Nothing
+        End If
         Set scope = mDescriptorTable.BeginDescriptorScope
         On Error GoTo CommandFailure
         If command.Redirections.Count > 0 Then
@@ -284,6 +296,7 @@ Private Function ExecuteParsedCommand(ByVal command As clsCommand) As String
 
         On Error GoTo RestoreFailure
         mDescriptorTable.RestoreDescriptorScope scope
+        Set scope = Nothing
     ElseIf command.Redirections.Count > 0 Then
         ApplyRedirections command, outputText, ErrorOutput
         ExecuteParsedCommand = outputText
@@ -306,6 +319,16 @@ BuiltinFailure:
     End If
     Resume Next
 
+PendingRestoreFailure:
+    errorNumber = Err.Number
+    errorDescription = Err.Description
+    On Error GoTo 0
+    HasOutput = False
+    ErrorOutput = "VBAsh: não foi possível restaurar os descritores pendentes: " & errorDescription
+    HasErrorOutput = True
+    LastExitCode = 1
+    Exit Function
+
 CommandFailure:
     errorNumber = Err.Number
     errorSource = Err.Source
@@ -317,6 +340,7 @@ CommandFailure:
         restoreErrorNumber = Err.Number
         restoreErrorDescription = Err.Description
         On Error GoTo 0
+        If restoreErrorNumber <> 0 Then Set mPendingDescriptorScope = scope
     End If
     HasOutput = False
     ErrorOutput = "VBAsh: " & errorDescription
@@ -332,6 +356,7 @@ RestoreFailure:
     restoreErrorNumber = Err.Number
     restoreErrorDescription = Err.Description
     On Error GoTo 0
+    Set mPendingDescriptorScope = scope
     HasErrorOutput = True
     If Len(ErrorOutput) > 0 Then ErrorOutput = ErrorOutput & vbCrLf
     ErrorOutput = ErrorOutput & "Falha ao restaurar descritores: " & restoreErrorDescription
