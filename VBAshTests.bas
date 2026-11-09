@@ -1,4 +1,4 @@
-' @VBAshRevision VBAshTests-r8
+' @VBAshRevision VBAshTests-r9
 Option Explicit
 
 Private mAssertions As Long
@@ -13,11 +13,11 @@ Private mLastAssertNumber As Long
 Private mLastAssertDescription As String
 Private mFailExpected As String
 Private mFailActual As String
-Private Const RUNNER_REVISION As String = "VBAshTests-r8"
+Private Const RUNNER_REVISION As String = "VBAshTests-r9"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
-Private Const EXPECTED_TEST_COUNT As Long = 24
+Private Const EXPECTED_TEST_COUNT As Long = 25
 
 Public Sub VBAsh_RunTests()
     Dim startedAt As Date
@@ -61,6 +61,7 @@ Public Sub VBAsh_RunTests()
     RunTest "ConsoleStream"
     RunTest "PipeStream"
     RunTest "ResolvedCommand"
+    RunTest "BuiltinRegistry"
 
     finishedAt = Now
     summary = TestRunSummary()
@@ -123,6 +124,7 @@ Private Sub RunTest(ByVal testName As String)
         Case "ConsoleStream": TestConsoleStream
         Case "PipeStream": TestPipeStream
         Case "ResolvedCommand": TestResolvedCommand
+        Case "BuiltinRegistry": TestBuiltinRegistry
         Case Else
             Err.Raise vbObjectError + 1102, "VBAshTests.RunTest", _
                       "Teste não registrado: " & testName
@@ -353,7 +355,7 @@ Private Function LoadedModuleReport(ByRef warnings As String, ByRef unverifiedCo
     names = Array("VBAsh", "VBAshTests", "IStream", "clsSession", "clsTokenizer", _
                   "clsParser", "clsFileStream", "clsMemoryStream", _
                   "clsNullStream", "clsFileDescriptorTable", "clsDescriptorScope", _
-                  "clsDescriptorScopeEntry", "clsRedirectionManager", "clsConsoleStream", "clsPipeStream", "clsResolvedCommand")
+                  "clsDescriptorScopeEntry", "clsRedirectionManager", "clsConsoleStream", "clsPipeStream", "clsResolvedCommand", "clsBuiltinRegistry")
     For index = LBound(names) To UBound(names)
         tag = ReadModuleTag(CStr(names(index)))
         prop = ReadModuleProperty(CStr(names(index)))
@@ -453,6 +455,10 @@ Private Function ReadModuleProperty(ByVal moduleName As String) As String
             Dim resolvedCommand As clsResolvedCommand
             Set resolvedCommand = New clsResolvedCommand
             ReadModuleProperty = resolvedCommand.ModuleRevision
+        Case "clsBuiltinRegistry"
+            Dim builtinRegistry As clsBuiltinRegistry
+            Set builtinRegistry = New clsBuiltinRegistry
+            ReadModuleProperty = builtinRegistry.ModuleRevision
     End Select
 Done:
 End Function
@@ -2909,6 +2915,71 @@ Private Sub TestResolvedCommand()
     Err.Clear
     On Error GoTo 0
     AssertEqual vbObjectError + 1301, errorNumber, "unsupported command type is rejected"
+End Sub
+
+
+Private Sub TestBuiltinRegistry()
+    Dim registry As clsBuiltinRegistry
+    Dim firstBuiltin As IBuiltin
+    Dim secondBuiltin As IBuiltin
+    Dim resolved As IBuiltin
+    Dim errorNumber As Long
+
+    Set registry = New clsBuiltinRegistry
+    AssertTrue registry.HasBuiltin("echo"), "default echo builtin is registered"
+    AssertTrue registry.HasBuiltin("ECHO"), "builtin lookup is case insensitive"
+    AssertTrue Not registry.HasBuiltin("custom-command"), "unknown builtin is absent"
+
+    Set firstBuiltin = New clsBuiltinEcho
+    registry.RegisterBuiltin "custom-command", firstBuiltin
+    AssertTrue registry.HasBuiltin("CUSTOM-COMMAND"), "custom builtin can be registered"
+    Set resolved = registry.Resolve("custom-command")
+    AssertTrue resolved Is firstBuiltin, "registry returns the registered builtin instance"
+
+    On Error Resume Next
+    Err.Clear
+    registry.RegisterBuiltin "custom-command", firstBuiltin
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual vbObjectError + 1322, errorNumber, "duplicate registration is rejected by default"
+
+    Set secondBuiltin = New clsBuiltinPwd
+    registry.RegisterBuiltin "custom-command", secondBuiltin, True
+    Set resolved = registry.Resolve("custom-command")
+    AssertTrue resolved Is secondBuiltin, "explicit replacement updates the registered instance"
+
+    AssertTrue registry.UnregisterBuiltin("custom-command"), "registered builtin can be removed"
+    AssertTrue Not registry.HasBuiltin("custom-command"), "removed builtin is no longer present"
+    AssertTrue Not registry.UnregisterBuiltin("custom-command"), "removing unknown builtin returns false"
+
+    On Error Resume Next
+    Err.Clear
+    registry.RegisterBuiltin " ", firstBuiltin
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual vbObjectError + 1320, errorNumber, "empty builtin name is rejected"
+
+    On Error Resume Next
+    Err.Clear
+    registry.RegisterBuiltin "bad name", firstBuiltin
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual vbObjectError + 1320, errorNumber, "builtin name containing whitespace is rejected"
+
+    On Error Resume Next
+    Err.Clear
+    registry.RegisterBuiltin "null-builtin", Nothing
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual vbObjectError + 1321, errorNumber, "missing builtin implementation is rejected"
+
+    AssertTrue Not registry.HasBuiltin(""), "empty lookup safely returns false"
+    Set resolved = registry.Resolve("not-registered")
+    AssertTrue resolved Is Nothing, "unknown builtin resolution returns Nothing"
 End Sub
 
 Private Sub AssertEqual(ByVal expected As Variant, ByVal actual As Variant, ByVal description As String)
