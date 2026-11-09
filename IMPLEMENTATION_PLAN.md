@@ -137,7 +137,19 @@ Implementar a camada de entrada/saída que representa stdin, stdout e stderr, al
 - `clsFileDescriptorTable` administra associações `FD -> IStream` após inicialização explícita dos FDs 0/1/2 com objetos fornecidos pelo host. Ownership por identidade é local à tabela; `ownsStream=True` transfere a responsabilidade de fechamento. O responsável deve chamar `CloseAll` explicitamente: não há fechamento automático em `Class_Terminate`. A operação remove FDs emprestados sem fechar seus streams, fecha cada stream próprio uma vez e remove seus aliases; se algum fechamento falhar, tenta os demais, preserva os aliases e ownership dos que falharam e retorna erros agregados para retry. A instância continua inicializada e reutilizável, mas `Initialize` não pode ser chamada novamente. Esta implementação isolada não conecta a tabela a `clsSession`, executor ou redirecionamentos.
 - O usuário informou execução Excel/VBA de `VBAshTests-r5` em 2026-11-06: 18/18 suítes PASS, 718 assertions, incluindo 62 PASS em `FileDescriptorTable`; checkout/commit não identificado e correspondência UNVERIFIED. A nova suíte `FileDescriptorTableCloseAll` em `VBAshTests-r6` não foi executada no Excel/VBA.
 
-Esta entrega completa apenas os streams isolados e a tabela de descritores isolada. A atribuição dos streams do host em tempo de execução, stdin/stdout/stderr da sessão, redirecionamento de entrada e conexão do executor com a tabela continuam pendentes de integração futura; os critérios gerais acima não devem ser considerados concluídos.
+### Integração da Fase 3 — implementação em revisão
+
+A branch `feature/phase-3-integration` conecta a tabela de descritores à sessão e ao executor de comandos simples:
+- `clsDescriptorScope` e `clsDescriptorScopeEntry` guardam snapshots de bindings por identidade de stream; os escopos são LIFO e mantêm referências aos streams originais durante a execução.
+- `clsRedirectionManager` aplica redirecionamentos em ordem lexical, abrindo `clsFileStream` para entrada/saída e usando `clsNullStream` para `/dev/null`.
+- A sessão prepara o escopo antes do builtin, encaminha stdout/stderr pelos FDs atuais e tenta restaurar os bindings depois da execução.
+- O host inicializa FD 0 com stream nulo em EOF e FDs 1/2 com adaptadores de captura `clsConsoleStream`; o formulário continua consumindo as strings de resultado após `ProcessInput`.
+- O lexer/parser preservam operadores de duplicação/fechamento `2>&1`, `2>&-`, `1>&2`, `n>&m` e `n>&-`.
+- `clsPipeStream` fornece apenas o buffer textual de base. Não há ainda scheduler, bloqueio, endpoints independentes por processo ou execução de pipeline.
+
+**Limites conhecidos desta integração:** os builtins ainda retornam strings, portanto a saída não é incremental e a ordem temporal entre chamadas independentes a stdout/stderr não pode ser reconstruída; a sessão escreve primeiro o resultado stdout e depois stderr. A entrada redirecionada está disponível no FD 0, mas os builtins atuais ainda não consomem esse stream. O host ainda usa stdin nulo, não entrada interativa. A execução de `cmd1 | cmd2` continua deliberadamente desabilitada e pertence à Fase 9.
+
+O runner de desenvolvimento foi atualizado para 23 suítes, incluindo escopos, redirecionamento integrado, adaptador de console e stream de pipe. **Esta revisão ainda precisa ser importada, compilada e executada no Excel/VBA.** Até que o relatório dessa execução confirme as 23 suítes e as revisões carregadas, a Fase 3 permanece em validação e não deve ser marcada como concluída.
 
 ---
 
