@@ -42,8 +42,11 @@ Public Function ResolveExecutable(ByVal commandName As String, _
         extensions = Split(pathValue, ";")
     End If
 
-    pathValue = sessionContext.GetEnv("PATH")
-    If Len(pathValue) = 0 Then pathValue = Environ$("PATH")
+    If sessionContext.Env.Exists("PATH") Then
+        pathValue = sessionContext.GetEnv("PATH")
+    Else
+        pathValue = Environ$("PATH")
+    End If
     If Len(pathValue) = 0 Then Exit Function
     pathEntries = Split(pathValue, ";")
 
