@@ -1,4 +1,4 @@
-' @VBAshRevision clsFileDescriptorTable-r2
+' @VBAshRevision clsFileDescriptorTable-r3
 Option Explicit
 
 Private Const FD_ERROR_NOT_INITIALIZED As Long = vbObjectError + 1250
@@ -17,7 +17,7 @@ Private mScopes As Collection
 
 ' Identifies the table API and ownership implementation revision.
 Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsFileDescriptorTable-r2"
+    ModuleRevision = "clsFileDescriptorTable-r3"
 End Property
 
 Private Sub Class_Initialize()
