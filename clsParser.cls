@@ -137,7 +137,6 @@ Private Function ParseSimpleCommand() As clsCommand
     Dim startPosition As Long
     Dim endPosition As Long
 
-    If CurrentTokenType() <> "WORD" Then RaiseUnexpectedOperator
     Set node = New clsCommand
     node.InitAstNode "SIMPLE_COMMAND", 0, 0
     startPosition = CurrentSourceStart()
