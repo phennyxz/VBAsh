@@ -201,8 +201,12 @@ Private Function ExecuteParsedCommand(ByVal command As clsCommand) As String
     Dim errorText As String
     Dim outputStream As IStream
     Dim errorStream As IStream
-    Dim outputIsConsole As Boolean
-    Dim errorIsConsole As Boolean
+    Dim visibleOutput As String
+    Dim visibleError As String
+    Dim visibleHasOutput As Boolean
+    Dim visibleHasError As Boolean
+    Dim outputHadText As Boolean
+    Dim errorHadText As Boolean
     Dim errorNumber As Long
     Dim errorSource As String
     Dim errorDescription As String
@@ -239,38 +243,44 @@ Private Function ExecuteParsedCommand(ByVal command As clsCommand) As String
     If Not mDescriptorTable Is Nothing Then
         Set outputStream = mDescriptorTable.GetDescriptor(1)
         Set errorStream = mDescriptorTable.GetDescriptor(2)
-        outputIsConsole = (outputStream Is mStandardOutput)
-        errorIsConsole = (errorStream Is mStandardError)
-        If HasOutput Or Len(outputText) > 0 Then
+        outputHadText = HasOutput Or Len(outputText) > 0
+        errorHadText = HasErrorOutput And Len(ErrorOutput) > 0
+        If outputHadText Then
             outputStream.WriteText outputText & IIf(SuppressNewline, "", vbCrLf)
         End If
-        If HasErrorOutput And Len(ErrorOutput) > 0 Then
+        If errorHadText Then
             errorText = ErrorOutput
             errorStream.WriteText errorText & vbCrLf
         End If
 
-        If outputIsConsole Then
-            ExecuteParsedCommand = outputText
-            HasOutput = HasOutput Or Len(outputText) > 0
-        Else
-            ExecuteParsedCommand = ""
-            HasOutput = False
+        ' Reconstruct only the host-visible channels. If both descriptors
+        ' reference the same capture stream, preserve the actual write order.
+        If outputStream Is mStandardOutput Then
+            visibleOutput = outputText
+            visibleHasOutput = outputHadText
+        ElseIf outputStream Is mStandardError Then
+            visibleError = outputText
+            visibleHasError = outputHadText
         End If
 
         If errorStream Is mStandardOutput Then
-            If HasErrorOutput Then
-                If Len(ExecuteParsedCommand) > 0 And Not SuppressNewline Then
-                    ExecuteParsedCommand = ExecuteParsedCommand & vbCrLf
-                End If
-                ExecuteParsedCommand = ExecuteParsedCommand & errorText
-                HasOutput = True
+            If errorHadText Then
+                If visibleHasOutput And Not SuppressNewline Then visibleOutput = visibleOutput & vbCrLf
+                visibleOutput = visibleOutput & errorText
+                visibleHasOutput = True
             End If
-            ErrorOutput = ""
-            HasErrorOutput = False
-        ElseIf Not errorIsConsole Then
-            ErrorOutput = ""
-            HasErrorOutput = False
+        ElseIf errorStream Is mStandardError Then
+            If errorHadText Then
+                If visibleHasError And Not SuppressNewline Then visibleError = visibleError & vbCrLf
+                visibleError = visibleError & errorText
+                visibleHasError = True
+            End If
         End If
+
+        ExecuteParsedCommand = visibleOutput
+        HasOutput = visibleHasOutput
+        ErrorOutput = visibleError
+        HasErrorOutput = visibleHasError
 
         On Error GoTo RestoreFailure
         mDescriptorTable.RestoreDescriptorScope scope
