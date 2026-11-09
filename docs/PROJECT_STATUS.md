@@ -53,7 +53,7 @@ O resultado acima é o relatório informado pelo usuário, preservado no reposit
 | Parser / AST | Implementado; evolução incremental | clsParser-r3; ParserAst e AstExecution PASS no r14 |
 | Builtins | Implementados parcialmente | README lista os comandos disponíveis; não implica compatibilidade Bash completa |
 | Process Manager | Pendente | execução de programas externos e gestão de processos não concluídas |
-| Pipes | Buffer e sintaxe existentes; execução de pipeline pendente | clsPipeStream é buffer textual; não há execução real de cmd1 | cmd2 |
+| Pipes | Buffer e sintaxe existentes; execução de pipeline pendente | clsPipeStream é buffer textual; não há execução real de pipeline entre comandos |
 | POSIX Layer | Pendente | fase posterior do roadmap |
 
 ## Limitações que não devem ser ocultadas
