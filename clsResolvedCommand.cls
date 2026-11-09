@@ -32,7 +32,7 @@ Public Sub Init(ByVal commandName As String, ByVal resolvedType As String, _
 
     normalizedType = UCase$(Trim$(resolvedType))
     Select Case normalizedType
-        Case "ALIAS", "FUNCTION", "BUILTIN", "EXTERNAL", "COMPOUND"
+        Case "ALIAS", "FUNCTION", "BUILTIN", "EXTERNAL", "COMPOUND", "UNRESOLVED"
             ' Valid resolved command type.
         Case Else
             Err.Raise vbObjectError + 1301, "clsResolvedCommand.Init", _
