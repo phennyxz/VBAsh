@@ -1591,6 +1591,12 @@ Private Sub TestDescriptorRedirection()
     contents = ReadRedirectedFile(fileSystem, path, "VBAsh: Uso: pwd" & vbCrLf, _
                                   "descriptor-based stderr")
     AssertEqual "VBAsh: Uso: pwd" & vbCrLf, contents, "descriptor manager writes stderr to file"
+    result = session.ProcessInput("echo routed 1>&2")
+    AssertEqual 0, session.LastExitCode, "stdout-to-stderr duplication preserves command status"
+    AssertTrue Not session.HasOutput, "stdout-to-stderr duplication removes normal output channel"
+    AssertTrue session.HasErrorOutput, "stdout-to-stderr duplication is visible on stderr channel"
+    AssertEqual "routed", session.ErrorOutput, "stdout-to-stderr duplication preserves output text"
+
     fileSystem.DeleteFile path, True
     table.CloseAll
 End Sub
