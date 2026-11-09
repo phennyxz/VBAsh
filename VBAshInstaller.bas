@@ -265,7 +265,7 @@ Private Function VBAshLegacyModuleNames() As Variant
         "clsCommand", "clsCommandResolver", "clsConsole", "clsFileDescriptorTable", _
         "clsFileStream", "clsParser", "clsRedirection", "clsSession", "clsStream", _
         "clsToken", "clsTokenizer", "clsBuiltinLs", "clsBuiltinMkdir", _
-        "clsAliasRegistry", "clsAliasExpander")
+        "clsAliasRegistry", "clsAliasExpander", "clsBuiltinAlias", "clsBuiltinUnalias")
 End Function
 
 Private Sub VBAshDeleteInstalledModules(ByVal sourceFiles As Variant)
