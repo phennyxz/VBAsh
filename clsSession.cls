@@ -14,6 +14,10 @@ Public ClearRequested As Boolean
 
 Private mPreviousDirectory As String
 Private mBuiltinRegistry As clsCommandResolver
+Private mDescriptorTable As clsFileDescriptorTable
+Private mRedirectionManager As clsRedirectionManager
+Private mStandardOutput As IStream
+Private mStandardError As IStream
 
 Private Sub Class_Initialize()
     CurrentDirectory = CurDir$
@@ -28,6 +32,19 @@ Private Sub Class_Initialize()
     If Len(Environ$("USERPROFILE")) > 0 Then
         SetEnv "HOME", Environ$("USERPROFILE")
     End If
+End Sub
+
+Public Sub ConfigureDescriptorTable(ByVal table As clsFileDescriptorTable, _
+                                     ByVal standardOutput As IStream, _
+                                     ByVal standardError As IStream)
+    If table Is Nothing Or standardOutput Is Nothing Or standardError Is Nothing Then
+        Err.Raise vbObjectError + 1280, "clsSession.ConfigureDescriptorTable", _
+                  "Tabela e streams padrão são obrigatórios."
+    End If
+    Set mDescriptorTable = table
+    Set mStandardOutput = standardOutput
+    Set mStandardError = standardError
+    Set mRedirectionManager = New clsRedirectionManager
 End Sub
 
 Public Sub SetEnv(ByVal key As String, ByVal value As String)
@@ -177,14 +194,33 @@ End Function
 Private Function ExecuteParsedCommand(ByVal command As clsCommand) As String
     Dim builtin As IBuiltin
     Dim separator As Long
+    Dim scope As clsDescriptorScope
+    Dim outputText As String
+    Dim errorText As String
+    Dim outputStream As IStream
+    Dim errorStream As IStream
+    Dim outputIsConsole As Boolean
+    Dim errorIsConsole As Boolean
     Dim errorNumber As Long
+    Dim errorSource As String
     Dim errorDescription As String
+    Dim restoreErrorNumber As Long
+    Dim restoreErrorDescription As String
 
     separator = InStr(1, command.Name, "=", vbBinaryCompare)
     If separator > 1 And command.Args.Count = 0 Then
         SetEnv Left$(command.Name, separator - 1), Mid$(command.Name, separator + 1)
         LastExitCode = 0
         Exit Function
+    End If
+
+    If Not mDescriptorTable Is Nothing Then
+        Set scope = mDescriptorTable.BeginDescriptorScope
+        On Error GoTo CommandFailure
+        If command.Redirections.Count > 0 Then
+            mRedirectionManager.ApplyRedirections mDescriptorTable, scope, _
+                                                  command.Redirections, CurrentDirectory
+        End If
     End If
 
     Set builtin = mBuiltinRegistry.Resolve(command.Name)
@@ -194,17 +230,59 @@ Private Function ExecuteParsedCommand(ByVal command As clsCommand) As String
         LastExitCode = 127
     Else
         LastExitCode = 0
-        On Error GoTo BuiltinError
-        ExecuteParsedCommand = builtin.Execute(Me, command.Args)
+        On Error GoTo BuiltinFailure
+        outputText = builtin.Execute(Me, command.Args)
     End If
 
-    If command.Redirections.Count > 0 Then
-        ApplyRedirections command, ExecuteParsedCommand, ErrorOutput
+    If Not mDescriptorTable Is Nothing Then
+        Set outputStream = mDescriptorTable.GetDescriptor(1)
+        Set errorStream = mDescriptorTable.GetDescriptor(2)
+        outputIsConsole = (outputStream Is mStandardOutput)
+        errorIsConsole = (errorStream Is mStandardError)
+        If HasOutput Or Len(outputText) > 0 Then
+            outputStream.WriteText outputText & IIf(SuppressNewline, "", vbCrLf)
+        End If
+        If HasErrorOutput And Len(ErrorOutput) > 0 Then
+            errorText = ErrorOutput
+            errorStream.WriteText errorText & vbCrLf
+        End If
+
+        If outputIsConsole Then
+            ExecuteParsedCommand = outputText
+            HasOutput = HasOutput Or Len(outputText) > 0
+        Else
+            ExecuteParsedCommand = ""
+            HasOutput = False
+        End If
+
+        If errorStream Is mStandardOutput Then
+            If HasErrorOutput Then
+                If Len(ExecuteParsedCommand) > 0 And Not SuppressNewline Then
+                    ExecuteParsedCommand = ExecuteParsedCommand & vbCrLf
+                End If
+                ExecuteParsedCommand = ExecuteParsedCommand & errorText
+                HasOutput = True
+            End If
+            ErrorOutput = ""
+            HasErrorOutput = False
+        ElseIf Not errorIsConsole Then
+            ErrorOutput = ""
+            HasErrorOutput = False
+        End If
+
+        On Error GoTo RestoreFailure
+        mDescriptorTable.RestoreDescriptorScope scope
+    ElseIf command.Redirections.Count > 0 Then
+        ApplyRedirections command, outputText, ErrorOutput
+        ExecuteParsedCommand = outputText
+    Else
+        ExecuteParsedCommand = outputText
     End If
     Exit Function
 
-BuiltinError:
+BuiltinFailure:
     errorNumber = Err.Number
+    errorSource = Err.Source
     errorDescription = Err.Description
     HasOutput = False
     ErrorOutput = "VBAsh: " & errorDescription
@@ -215,6 +293,37 @@ BuiltinError:
         LastExitCode = 1
     End If
     Resume Next
+
+CommandFailure:
+    errorNumber = Err.Number
+    errorSource = Err.Source
+    errorDescription = Err.Description
+    On Error GoTo 0
+    If Not scope Is Nothing Then
+        On Error Resume Next
+        mDescriptorTable.RestoreDescriptorScope scope
+        restoreErrorNumber = Err.Number
+        restoreErrorDescription = Err.Description
+        On Error GoTo 0
+    End If
+    HasOutput = False
+    ErrorOutput = "VBAsh: " & errorDescription
+    If restoreErrorNumber <> 0 Then
+        ErrorOutput = ErrorOutput & vbCrLf & _
+                      "Falha ao restaurar descritores: " & restoreErrorDescription
+    End If
+    HasErrorOutput = True
+    LastExitCode = 1
+    Exit Function
+
+RestoreFailure:
+    restoreErrorNumber = Err.Number
+    restoreErrorDescription = Err.Description
+    On Error GoTo 0
+    HasErrorOutput = True
+    If Len(ErrorOutput) > 0 Then ErrorOutput = ErrorOutput & vbCrLf
+    ErrorOutput = ErrorOutput & "Falha ao restaurar descritores: " & restoreErrorDescription
+    LastExitCode = 1
 End Function
 
 Private Function ExecuteFor(ByVal tokens As Collection, ByVal originalText As String) As String
