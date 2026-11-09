@@ -1,4 +1,4 @@
-' @VBAshRevision clsSession-r2
+' @VBAshRevision clsSession-r3
 Option Explicit
 
 Public CurrentDirectory As String
@@ -22,7 +22,7 @@ Private mStandardError As clsConsoleStream
 Private mPendingDescriptorScope As clsDescriptorScope
 
 Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsSession-r2"
+    ModuleRevision = "clsSession-r3"
 End Property
 
 
@@ -984,6 +984,9 @@ Private Sub ApplyRedirections(ByVal command As clsCommand, ByVal output As Strin
                         stdoutAppend = (redirection.Operator = "REDIR_APPEND")
                     End If
                 End If
+            Case "REDIR_IN"
+                Err.Raise vbObjectError + 1027, "clsSession", _
+                    "Redirecionamento de entrada requer tabela de descritores."
             Case "REDIR_DISCARD"
                 stdoutType = "DISCARD"
             Case "REDIR_ERR_DISCARD"
