@@ -348,7 +348,8 @@ Private Function LoadedModuleReport(ByRef warnings As String, ByRef unverifiedCo
     Dim line As String
     Dim note As String
 
-    names = Array("VBAshTests", "IStream", "clsFileStream", "clsMemoryStream", _
+    names = Array("VBAsh", "VBAshTests", "IStream", "clsSession", "clsTokenizer", _
+                  "clsParser", "clsFileStream", "clsMemoryStream", _
                   "clsNullStream", "clsFileDescriptorTable", "clsDescriptorScope", _
                   "clsDescriptorScopeEntry", "clsRedirectionManager", "clsConsoleStream", "clsPipeStream")
     For index = LBound(names) To UBound(names)
@@ -414,6 +415,18 @@ Private Function ReadModuleProperty(ByVal moduleName As String) As String
             Dim nullStream As clsNullStream
             Set nullStream = New clsNullStream
             ReadModuleProperty = nullStream.ModuleRevision
+        Case "clsSession"
+            Dim sessionInstance As clsSession
+            Set sessionInstance = New clsSession
+            ReadModuleProperty = sessionInstance.ModuleRevision
+        Case "clsTokenizer"
+            Dim tokenizerInstance As clsTokenizer
+            Set tokenizerInstance = New clsTokenizer
+            ReadModuleProperty = tokenizerInstance.ModuleRevision
+        Case "clsParser"
+            Dim parserInstance As clsParser
+            Set parserInstance = New clsParser
+            ReadModuleProperty = parserInstance.ModuleRevision
         Case "clsFileDescriptorTable"
             Dim descriptorTable As clsFileDescriptorTable
             Set descriptorTable = New clsFileDescriptorTable
