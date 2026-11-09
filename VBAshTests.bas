@@ -1,4 +1,4 @@
-' @VBAshRevision VBAshTests-r13
+' @VBAshRevision VBAshTests-r14
 Option Explicit
 
 Private mAssertions As Long
@@ -13,7 +13,7 @@ Private mLastAssertNumber As Long
 Private mLastAssertDescription As String
 Private mFailExpected As String
 Private mFailActual As String
-Private Const RUNNER_REVISION As String = "VBAshTests-r13"
+Private Const RUNNER_REVISION As String = "VBAshTests-r14"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
@@ -3028,6 +3028,7 @@ Private Sub TestBuiltinRegistry()
     Dim secondBuiltin As IBuiltin
     Dim resolved As IBuiltin
     Dim errorNumber As Long
+    Dim session As clsSession
 
     Set registry = New clsBuiltinRegistry
     AssertTrue registry.HasBuiltin("echo"), "default echo builtin is registered"
@@ -3086,6 +3087,13 @@ Private Sub TestBuiltinRegistry()
     AssertTrue Not registry.HasBuiltin(""), "empty lookup safely returns false"
     Set resolved = registry.Resolve("not-registered")
     AssertTrue resolved Is Nothing, "unknown builtin resolution returns Nothing"
+
+    Set session = New clsSession
+    Set firstBuiltin = New clsBuiltinEcho
+    session.RegisterBuiltin "custom-session-builtin", firstBuiltin
+    AssertTrue session.HasBuiltin("custom-session-builtin"), "session exposes builtin registration"
+    AssertTrue session.RemoveBuiltin("custom-session-builtin"), "session exposes builtin removal"
+    AssertTrue Not session.HasBuiltin("custom-session-builtin"), "removed session builtin is absent"
 End Sub
 
 Private Sub AssertEqual(ByVal expected As Variant, ByVal actual As Variant, ByVal description As String)
