@@ -1,10 +1,10 @@
-' @VBAshRevision clsAliasRegistry-r1
+' @VBAshRevision clsAliasRegistry-r2
 Option Explicit
 
 Private mAliases As Object
 
 Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsAliasRegistry-r1"
+    ModuleRevision = "clsAliasRegistry-r2"
 End Property
 
 Private Sub Class_Initialize()
@@ -56,6 +56,20 @@ Public Function RemoveAlias(ByVal aliasName As String) As Boolean
     mAliases.Remove normalizedName
     RemoveAlias = True
 End Function
+
+Public Function GetAliasNames() As Collection
+    Dim names As New Collection
+    Dim aliasName As Variant
+
+    For Each aliasName In mAliases.Keys
+        names.Add CStr(aliasName)
+    Next aliasName
+    Set GetAliasNames = names
+End Function
+
+Public Sub ClearAliases()
+    If mAliases.Count > 0 Then mAliases.RemoveAll
+End Sub
 
 Public Property Get Count() As Long
     Count = mAliases.Count
