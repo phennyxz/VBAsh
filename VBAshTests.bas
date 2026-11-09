@@ -1,4 +1,4 @@
-' @VBAshRevision VBAshTests-r12
+' @VBAshRevision VBAshTests-r13
 Option Explicit
 
 Private mAssertions As Long
@@ -13,11 +13,11 @@ Private mLastAssertNumber As Long
 Private mLastAssertDescription As String
 Private mFailExpected As String
 Private mFailActual As String
-Private Const RUNNER_REVISION As String = "VBAshTests-r12"
+Private Const RUNNER_REVISION As String = "VBAshTests-r13"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
-Private Const EXPECTED_TEST_COUNT As Long = 28
+Private Const EXPECTED_TEST_COUNT As Long = 29
 
 Public Sub VBAsh_RunTests()
     Dim startedAt As Date
@@ -65,6 +65,7 @@ Public Sub VBAsh_RunTests()
     RunTest "CommandResolver"
     RunTest "AliasExpansion"
     RunTest "AliasBuiltins"
+    RunTest "FunctionRegistry"
 
     finishedAt = Now
     summary = TestRunSummary()
@@ -131,6 +132,7 @@ Private Sub RunTest(ByVal testName As String)
         Case "CommandResolver": TestCommandResolver
         Case "AliasExpansion": TestAliasExpansion
         Case "AliasBuiltins": TestAliasBuiltins
+        Case "FunctionRegistry": TestFunctionRegistry
         Case Else
             Err.Raise vbObjectError + 1102, "VBAshTests.RunTest", _
                       "Teste não registrado: " & testName
@@ -362,7 +364,8 @@ Private Function LoadedModuleReport(ByRef warnings As String, ByRef unverifiedCo
                   "clsParser", "clsFileStream", "clsMemoryStream", _
                   "clsNullStream", "clsFileDescriptorTable", "clsDescriptorScope", _
                   "clsDescriptorScopeEntry", "clsRedirectionManager", "clsConsoleStream", "clsPipeStream", "clsResolvedCommand", "clsBuiltinRegistry", "clsCommandResolver", "clsAliasRegistry", "clsAliasExpander", _
-                  "clsBuiltinAlias", "clsBuiltinUnalias")
+                  "clsBuiltinAlias", "clsBuiltinUnalias", "clsFunctionRegistry", _
+                  "clsExternalCommandResolver")
     For index = LBound(names) To UBound(names)
         tag = ReadModuleTag(CStr(names(index)))
         prop = ReadModuleProperty(CStr(names(index)))
@@ -458,6 +461,14 @@ Private Function ReadModuleProperty(ByVal moduleName As String) As String
             Dim builtinUnaliasInstance As clsBuiltinUnalias
             Set builtinUnaliasInstance = New clsBuiltinUnalias
             ReadModuleProperty = builtinUnaliasInstance.ModuleRevision
+        Case "clsFunctionRegistry"
+            Dim functionRegistryInstance As clsFunctionRegistry
+            Set functionRegistryInstance = New clsFunctionRegistry
+            ReadModuleProperty = functionRegistryInstance.ModuleRevision
+        Case "clsExternalCommandResolver"
+            Dim externalResolverInstance As clsExternalCommandResolver
+            Set externalResolverInstance = New clsExternalCommandResolver
+            ReadModuleProperty = externalResolverInstance.ModuleRevision
         Case "clsFileDescriptorTable"
             Dim descriptorTable As clsFileDescriptorTable
             Set descriptorTable = New clsFileDescriptorTable
@@ -2978,19 +2989,38 @@ Private Sub TestCommandResolver()
     AssertTrue storedRedirection Is redirection, "resolver preserves redirection object identity"
     AssertTrue Not (resolved.Builtin Is Nothing), "builtin resolution supplies implementation"
 
-    source.Init "not-a-registered-command", "not-a-registered-command"
+    Dim functionBody As clsCommand
+    Dim externalPath As String
+
+    Set functionBody = New clsCommand
+    functionBody.Init "echo", "echo function-body"
+    functionBody.AddArg "function-body"
+    session.RegisterFunction "echo", functionBody
+    source.Init "echo", "echo builtin"
+    Set resolved = resolver.ResolveCommand(source, session)
+    AssertEqual "FUNCTION", resolved.CommandType, "registered function takes precedence over builtin"
+    AssertTrue resolved.FunctionBody Is functionBody, "resolved function retains its AST body"
+    AssertTrue session.RemoveFunction("echo"), "session removes a registered function"
+
+    source.Init "echo", "echo builtin"
+    Set resolved = resolver.ResolveCommand(source, session)
+    AssertEqual "BUILTIN", resolved.CommandType, "builtin resolves after function removal"
+
+    source.Init "cmd.exe", "cmd.exe"
+    Set resolved = resolver.ResolveCommand(source, session)
+    AssertEqual "EXTERNAL", resolved.CommandType, "PATH executable is classified as EXTERNAL"
+    externalPath = resolved.ExecutablePath
+    AssertTrue Len(externalPath) > 0, "external resolution returns a concrete executable path"
+
+    source.Init "not-a-registered-command-vbash-test", "not-a-registered-command-vbash-test"
     Set resolved = resolver.ResolveCommand(source, session)
     AssertEqual "UNRESOLVED", resolved.CommandType, "unknown command is explicitly unresolved"
     AssertEqual 0, resolved.Args.Count, "unknown command retains empty argument list"
     AssertTrue resolved.Builtin Is Nothing, "unknown command has no builtin implementation"
 
     source.InitAstNode "PIPELINE", 0, 1
-    On Error Resume Next
-    Err.Clear
     Set resolved = resolver.ResolveCommand(source, session)
-    AssertEqual True, (Err.Number <> 0), "resolver rejects non-simple AST nodes"
-    Err.Clear
-    On Error GoTo 0
+    AssertEqual "COMPOUND", resolved.CommandType, "non-simple AST nodes are classified as COMPOUND"
 End Sub
 
 Private Sub TestBuiltinRegistry()
@@ -3080,6 +3110,44 @@ Private Sub AssertTrue(ByVal condition As Boolean, ByVal description As String)
     End If
 End Sub
 
+
+Private Sub TestFunctionRegistry()
+    Dim registry As clsFunctionRegistry
+    Dim body As clsCommand
+    Dim storedBody As clsCommand
+    Dim errorNumber As Long
+
+    Set registry = New clsFunctionRegistry
+    Set body = New clsCommand
+    body.Init "echo", "echo from-function"
+    body.AddArg "from-function"
+
+    registry.RegisterFunction "greet", body
+    AssertTrue registry.HasFunction("greet"), "function registry reports registered functions"
+    Set storedBody = registry.Resolve("greet")
+    AssertTrue storedBody Is body, "function registry preserves function body identity"
+    AssertEqual 1, registry.Count, "function registry tracks registered functions"
+
+    On Error Resume Next
+    Err.Clear
+    registry.RegisterFunction "greet", body
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual vbObjectError + 1432, errorNumber, "duplicate function registration is rejected"
+
+    On Error Resume Next
+    Err.Clear
+    registry.RegisterFunction "bad name", body
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual vbObjectError + 1430, errorNumber, "invalid function name is rejected"
+
+    AssertTrue registry.RemoveFunction("greet"), "registered function can be removed"
+    AssertTrue Not registry.HasFunction("greet"), "removed function is absent"
+    AssertTrue Not registry.RemoveFunction("greet"), "removing absent function returns False"
+End Sub
 
 Private Sub TestAliasBuiltins()
     Dim session As clsSession
