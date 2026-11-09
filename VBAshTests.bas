@@ -1670,7 +1670,7 @@ Private Sub TestDescriptorRedirection()
                 "VBAsh: Uso: pwd" & vbCrLf, contents, "descriptor manager appends stderr to file"
 
     result = session.ProcessInput("echo routed 1>&2")
-    AssertEqual 0, session.LastExitCode, "stdout-to-stderr duplication preserves command status"
+    AssertEqual 0, session.LastExitCode, "stdout-to-stderr duplication preserves command status; ErrorOutput=[" & session.ErrorOutput & "]; HasErrorOutput=[" & CStr(session.HasErrorOutput) & "]; result=[" & result & "]"
     AssertTrue Not session.HasOutput, "stdout-to-stderr duplication removes normal output channel"
     AssertTrue session.HasErrorOutput, "stdout-to-stderr duplication is visible on stderr channel"
     AssertEqual "routed", session.ErrorOutput, "stdout-to-stderr duplication preserves output text"
