@@ -751,6 +751,12 @@ Private Sub TestTokenizer()
     Set token = tokens(2)
     AssertEqual "hello", token.Value, "plain command word"
 
+    Set tokens = tokenizer.Tokenize("echo hi 12>&34 12>&-")
+    AssertEqual "REDIR_FD_DUP", tokens(3).TokenType, "generic descriptor duplication token type"
+    AssertEqual "12>&34", tokens(3).Value, "generic descriptor duplication preserves multi-digit operands"
+    AssertEqual "REDIR_FD_CLOSE", tokens(4).TokenType, "generic descriptor close token type"
+    AssertEqual "12>&-", tokens(4).Value, "generic descriptor close preserves descriptor number"
+
     Set tokens = tokenizer.Tokenize("echo ""hello world""")
     AssertEqual 3, tokens.Count, "token count includes EOF"
     Set token = tokens(2)
