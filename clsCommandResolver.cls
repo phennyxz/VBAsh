@@ -1,4 +1,4 @@
-' @VBAshRevision clsCommandResolver-r2
+' @VBAshRevision clsCommandResolver-r3
 Option Explicit
 
 Private mBuiltinRegistry As clsBuiltinRegistry
@@ -6,7 +6,7 @@ Private mFunctionRegistry As clsFunctionRegistry
 Private mExternalResolver As clsExternalCommandResolver
 
 Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsCommandResolver-r2"
+    ModuleRevision = "clsCommandResolver-r3"
 End Property
 
 Private Sub Class_Initialize()
@@ -18,6 +18,19 @@ End Sub
 ' Compatibility API retained for existing callers.
 Public Function Resolve(ByVal commandName As String) As IBuiltin
     Set Resolve = mBuiltinRegistry.Resolve(commandName)
+End Function
+
+Public Sub RegisterBuiltin(ByVal commandName As String, ByVal builtin As IBuiltin, _
+                           Optional ByVal replaceExisting As Boolean = False)
+    mBuiltinRegistry.RegisterBuiltin commandName, builtin, replaceExisting
+End Sub
+
+Public Function HasBuiltin(ByVal commandName As String) As Boolean
+    HasBuiltin = mBuiltinRegistry.HasBuiltin(commandName)
+End Function
+
+Public Function UnregisterBuiltin(ByVal commandName As String) As Boolean
+    UnregisterBuiltin = mBuiltinRegistry.UnregisterBuiltin(commandName)
 End Function
 
 Public Sub RegisterFunction(ByVal functionName As String, ByVal functionBody As clsCommand, _
