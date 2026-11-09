@@ -192,11 +192,15 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 
 ### Integração do resolver — Fase 4C
 
-- `clsCommandResolver.ResolveCommand(sourceNode, sessionContext)` recebe somente nós AST `SIMPLE_COMMAND` já expandidos pela sessão; não repete expansão nem executa comandos.
-- O resolver classifica builtins registrados como `BUILTIN`, preserva a API legada `Resolve(commandName) As IBuiltin` e retorna `UNRESOLVED` para nomes ainda não registrados.
+- `clsCommandResolver.ResolveCommand(sourceNode, sessionContext)` recebe nós AST já expandidos pela sessão; não repete expansão nem executa comandos.
+- A resolução de comandos simples respeita a precedência FUNCTION → BUILTIN → EXTERNAL. A expansão de aliases acontece antes da AST; não há lookup tardio de alias.
+- `clsFunctionRegistry` registra corpos AST por nome, com nomes case-sensitive, validação e política explícita para duplicatas.
+- `clsExternalCommandResolver` procura executáveis no PATH usando PATHEXT do Windows e retorna o caminho encontrado; não inicia processos.
+- Nós AST não simples são classificados como `COMPOUND`; nomes sem correspondência permanecem `UNRESOLVED`.
+- O resolver preserva a API legada `Resolve(commandName) As IBuiltin`.
 - O objeto resolvido mantém referência ao nó AST original, copia os argumentos já expandidos e preserva a identidade dos objetos de redirecionamento.
 - `clsSession` passa a consumir o resultado do resolver para executar builtins; comandos `UNRESOLVED` retornam status 127. Nenhum processo externo é iniciado.
-- Aliases, funções e descoberta de executáveis continuam pendentes; a prioridade completa de resolução ainda não está implementada.
+- A execução de funções e de programas externos continua pendente: o registry/resolver apenas classifica e fornece o corpo AST ou caminho executável. A execução externa pertence à Fase 8; a sintaxe/execução de definições de função depende do parser e executor de funções.
 - A suíte `CommandResolver` foi adicionada ao runner `VBAshTests-r10`; a validação de compilação e execução no Excel/VBA depende da importação e do relatório do usuário.
 
 ### Integração de aliases — Fase 4D
@@ -215,17 +219,22 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 - O shell consegue classificar builtins e manter um resultado de resolução separado da AST.
 - A expansão lexical de aliases ocorre antes da AST e, portanto, antes da resolução de comandos.
 - Os aliases podem ser criados, consultados, listados e removidos pelos builtins `alias` e `unalias`.
-- A resolução pós-AST deverá respeitar a prioridade entre função, builtin e executável externo quando os registries de funções e o resolvedor de executáveis forem introduzidos nas fases que fornecem essas capacidades.
+- A resolução pós-AST respeita a prioridade FUNCTION → BUILTIN → EXTERNAL; aliases já foram expandidos lexicalmente antes da AST.
+- Nós não simples são classificados como COMPOUND; nomes sem correspondência são UNRESOLVED.
+- A resolução externa retorna o caminho encontrado no PATH, mas não executa o processo.
 - Comandos sem nome não são aceitos.
 - O objeto CCommand armazena nome, Args, redireções, contexto e tipo.
 - A resolução é separada da execução.
 
 ### Testes mínimos
 - Teste 1: builtin registrado é reconhecido corretamente.
-- Teste 2: alias registrado é expandido antes da AST e o nome resultante segue para a resolução pós-AST.
-- Teste 3: `alias NOME=VALOR`, `alias NOME`, `alias`, `unalias NOME` e `unalias -a` operam sobre o registry da sessão.
-- Teste 4: comando vazio retorna erro sem quebrar shell.
-- Testes de precedência de funções e descoberta de executáveis externos ficam vinculados às implementações dos registries/resolvedores correspondentes; a execução externa permanece dependente da Fase 8.
+- Teste 2: função registrada tem precedência sobre builtin e executável.
+- Teste 3: executável presente no PATH é classificado como EXTERNAL e tem caminho resolvido.
+- Teste 4: alias registrado é expandido antes da AST e o nome resultante segue para a resolução pós-AST.
+- Teste 5: `alias NOME=VALOR`, `alias NOME`, `alias`, `unalias NOME` e `unalias -a` operam sobre o registry da sessão.
+- Teste 6: nós AST não simples são classificados como COMPOUND; comando desconhecido permanece UNRESOLVED.
+- Teste 7: comando vazio retorna erro sem quebrar shell.
+- A execução de funções e processos externos permanece fora da Fase 4.
 
 ---
 
@@ -551,11 +560,14 @@ Este plano foi desenhado para evoluir de forma incremental, sem overengineering 
 - A implementação ainda precisa ser importada/compilada e executada no Excel/VBA; só então a Fase 4 poderá ser fechada funcionalmente.
 
 
-### Implementação da interface de aliases — Fase 4E (2026-11-09)
+### Consolidação do resolver e interface de aliases — Fase 4E (2026-11-09)
 
 - `clsBuiltinAlias` e `clsBuiltinUnalias` foram adicionados e registrados em `clsBuiltinRegistry-r2`.
 - `alias NOME=VALOR` cria/substitui; `alias NOME` consulta; `alias` lista; `unalias NOME` remove; `unalias -a` limpa todos.
 - `clsAliasRegistry-r2` e `clsSession-r6` expõem listagem e limpeza de aliases.
-- O instalador inclui os dois novos módulos; `help` lista os comandos.
-- O runner `VBAshTests-r12` inclui a suíte `AliasBuiltins`, com execução por `ProcessInput`.
-- Estado: implementação publicada; compilação e execução no Excel/VBA ainda pendentes. A Fase 4 não deve ser marcada como validada até o runner r12 passar.
+- `clsFunctionRegistry-r1` registra corpos AST de funções e `clsExternalCommandResolver-r1` procura executáveis no PATH/PATHEXT.
+- `clsCommandResolver-r2` aplica FUNCTION → BUILTIN → EXTERNAL, classifica nós não simples como COMPOUND e mantém UNRESOLVED para nomes não encontrados.
+- `clsResolvedCommand-r2` carrega o corpo AST da função ou caminho do executável. A execução desses dois tipos continua deliberadamente fora desta fase.
+- O instalador inclui os novos módulos; `help` lista os comandos alias/unalias.
+- O runner `VBAshTests-r13` acrescenta `AliasBuiltins` e `FunctionRegistry`, além de ampliar `CommandResolver` para precedência, PATH e COMPOUND.
+- Estado: implementação publicada; compilação e execução no Excel/VBA ainda pendentes. A Fase 4 só poderá ser fechada após o runner r13 passar.
