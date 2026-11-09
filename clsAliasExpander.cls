@@ -78,7 +78,7 @@ Private Function ExpandSequence(ByVal sourceTokens As Collection, _
         End If
 
         If commandPosition And token.TokenType = "WORD" Then
-            If IsAssignmentWord(token.Value) Then
+            If IsAssignmentWord(token) Then
                 result.Add token
                 GoTo ContinueToken
             End If
@@ -169,15 +169,27 @@ Private Function IsUnquotedWord(ByVal token As clsToken) As Boolean
     IsUnquotedWord = True
 End Function
 
-Private Function IsAssignmentWord(ByVal value As String) As Boolean
+Private Function IsAssignmentWord(ByVal token As clsToken) As Boolean
     Dim separator As Long
     Dim namePart As String
     Dim i As Long
     Dim ch As String
+    Dim segment As clsWordSegment
+    Dim checkedCharacters As Long
 
-    separator = InStr(1, value, "=", vbBinaryCompare)
+    separator = InStr(1, token.Value, "=", vbBinaryCompare)
     If separator <= 1 Then Exit Function
-    namePart = Left$(value, separator - 1)
+    namePart = Left$(token.Value, separator - 1)
+
+    For Each segment In token.Segments
+        For i = 1 To Len(segment.Text)
+            If checkedCharacters >= Len(namePart) Then Exit For
+            If segment.QuoteContext <> "UNQUOTED" Or segment.IsEscaped Then Exit Function
+            checkedCharacters = checkedCharacters + 1
+        Next i
+        If checkedCharacters >= Len(namePart) Then Exit For
+    Next segment
+    If checkedCharacters <> Len(namePart) Then Exit Function
 
     For i = 1 To Len(namePart)
         ch = Mid$(namePart, i, 1)
