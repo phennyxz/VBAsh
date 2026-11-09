@@ -2852,6 +2852,7 @@ Private Sub TestResolvedCommand()
     Dim command As clsResolvedCommand
     Dim session As clsSession
     Dim redirection As clsRedirection
+    Dim storedRedirection As clsRedirection
     Dim errorNumber As Long
 
     Set session = New clsSession
@@ -2878,12 +2879,20 @@ Private Sub TestResolvedCommand()
     redirection.Target = "out.txt"
     command.AddRedirection redirection
     AssertEqual 1, command.Redirections.Count, "resolved command stores redirections"
-    AssertTrue command.Redirections(1) Is redirection, "resolved command preserves redirection identity"
+    Set storedRedirection = command.Redirections(1)
+    AssertTrue storedRedirection Is redirection, "resolved command preserves redirection identity"
 
     command.Init "myalias", "alias", session
     AssertEqual "ALIAS", command.CommandType, "alias type is accepted"
     AssertEqual 0, command.Args.Count, "reinitialization clears prior arguments"
     AssertEqual 0, command.Redirections.Count, "reinitialization clears prior redirections"
+
+    command.Init "myfunction", "function", session
+    AssertEqual "FUNCTION", command.CommandType, "function type is accepted"
+    command.Init "cmd.exe", "external", session
+    AssertEqual "EXTERNAL", command.CommandType, "external type is accepted"
+    command.Init "{ block; }", "compound", session
+    AssertEqual "COMPOUND", command.CommandType, "compound type is accepted"
 
     On Error Resume Next
     Err.Clear
