@@ -35,7 +35,9 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
         End If
 
         ' Generic descriptor duplication/closure: n>&m and n>&-.
-        If ch >= "0" And ch <= "9" Then
+        If ch >= "0" And ch <= "9" And _
+           Mid$(mSource, mIndex, 4) <> "2>&1" And _
+           Mid$(mSource, mIndex, 4) <> "2>&-" Then
             descriptorEnd = mIndex
             Do While descriptorEnd <= mLen
                 ch = Mid$(mSource, descriptorEnd, 1)
