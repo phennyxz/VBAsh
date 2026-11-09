@@ -1,4 +1,4 @@
-' @VBAshRevision clsSession-r4
+' @VBAshRevision clsSession-r5
 Option Explicit
 
 Public CurrentDirectory As String
