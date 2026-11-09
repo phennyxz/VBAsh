@@ -232,6 +232,7 @@ Private Function ExecuteParsedCommand(ByVal command As clsCommand) As String
             On Error GoTo PendingRestoreFailure
             mDescriptorTable.RestoreDescriptorScope mPendingDescriptorScope
             Set mPendingDescriptorScope = Nothing
+            On Error GoTo 0
         End If
         Set scope = mDescriptorTable.BeginDescriptorScope
         On Error GoTo CommandFailure
@@ -336,6 +337,7 @@ CommandFailure:
     On Error GoTo 0
     If Not scope Is Nothing Then
         On Error Resume Next
+        Err.Clear
         mDescriptorTable.RestoreDescriptorScope scope
         restoreErrorNumber = Err.Number
         restoreErrorDescription = Err.Description
