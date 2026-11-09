@@ -205,3 +205,20 @@ O usuário informou execução real em Excel/VBA de `VBAshTests-r5`: 18/18 suít
 `clsFileDescriptorTable-r2` acrescenta limpeza explícita solicitada ao chamador: streams próprios são fechados uma vez por identidade; FDs emprestados são removidos sem fechamento. Um erro de fechamento não impede os demais: FDs e ownership do stream falho permanecem, os erros originais são agregados com todos os FDs iniciais e o chamador pode repetir a operação. A tabela permanece inicializada e reutilizável, mas não permite outra `Initialize`; não há limpeza automática em `Class_Terminate`. Ownership é local à instância e não rastreia referências externas.
 
 `VBAshTests-r6` adiciona a suíte `FileDescriptorTableCloseAll` e mantém as suítes anteriores. Ela cobre aliases, emprestados, erros múltiplos e originais, sucesso parcial, stream fechado antes de falhar, retry, limpeza repetida, reentrada e reutilização. Verificações estáticas: `git diff --check`; estrutura de 35 módulos; assinaturas dos 10 membros de `IStream` nos quatro implementadores; 19 suítes registradas e despachadas; 41 assertions no fonte da suíte nova e 62 na suíte anterior, preservada sem alteração. **NOT RUN:** não houve compilação ou execução Excel/VBA desta nova revisão nesta sessão. O relato de `r5` acima não valida `r6` ou `clsFileDescriptorTable-r2`.
+
+
+## Integração da Fase 3 — fonte preparada para validação Excel/VBA
+
+| Campo | Registro |
+|---|---|
+| Branch | `feature/phase-3-integration` |
+| Runner na fonte | `VBAshTests-r7` |
+| Suítes registradas | 23 |
+| Execução Excel/VBA nesta revisão | NOT RUN |
+| Compilação VBA nesta revisão | NOT RUN |
+| Commit de implementação | Sequência de commits na branch; confirmar HEAD no GitHub antes da importação |
+| Resultado funcional | Pendente |
+
+A fonte inclui escopos de descritores, gerenciador de redirecionamentos, adaptadores de captura para stdout/stderr, stream nulo para stdin, buffer de pipe e integração com a sessão. Também inclui testes de escopos, redirecionamento integrado, console e pipe. Foram feitas apenas inspeções estáticas nesta sessão; nenhuma execução VBA foi realizada e nenhum resultado PASS é declarado.
+
+**Atenção ao importar:** use uma cópia limpa do workbook e todos os arquivos `.bas`/ `.cls` da mesma revisão da branch. O instalador enumera os módulos na pasta raiz e inclui os novos módulos automaticamente. Depois de importar, compile o projeto VBA antes de executar `VBAsh_RunTests`. O relatório deve identificar `VBAshTests-r7`, `clsFileDescriptorTable-r3`, `clsDescriptorScope-r1`, `clsRedirectionManager-r1`, `clsConsoleStream-r1` e `clsPipeStream-r1`. Registre qualquer divergência como ERROR/FAIL; não substitua o resultado por uma inspeção estática.
