@@ -15,6 +15,7 @@ Public ClearRequested As Boolean
 
 Private mPreviousDirectory As String
 Private mBuiltinRegistry As clsCommandResolver
+Private mAliasRegistry As clsAliasRegistry
 Private mDescriptorTable As clsFileDescriptorTable
 Private mRedirectionManager As clsRedirectionManager
 Private mStandardOutput As clsConsoleStream
@@ -35,6 +36,7 @@ Private Sub Class_Initialize()
     Prompt = "vbash> "
     ShouldExit = False
     Set mBuiltinRegistry = New clsCommandResolver
+    Set mAliasRegistry = New clsAliasRegistry
 
     If Len(Environ$("USERPROFILE")) > 0 Then
         SetEnv "HOME", Environ$("USERPROFILE")
@@ -59,6 +61,30 @@ Public Sub RetryPendingDescriptorRestoration()
     mDescriptorTable.RestoreDescriptorScope mPendingDescriptorScope
     Set mPendingDescriptorScope = Nothing
 End Sub
+
+Public Sub RegisterAlias(ByVal aliasName As String, ByVal replacementText As String, _
+                         Optional ByVal replaceExisting As Boolean = False)
+    mAliasRegistry.RegisterAlias aliasName, replacementText, replaceExisting
+End Sub
+
+Public Function HasAlias(ByVal aliasName As String) As Boolean
+    HasAlias = mAliasRegistry.HasAlias(aliasName)
+End Function
+
+Public Function GetAlias(ByVal aliasName As String) As String
+    GetAlias = mAliasRegistry.ResolveAlias(aliasName)
+End Function
+
+Public Function RemoveAlias(ByVal aliasName As String) As Boolean
+    RemoveAlias = mAliasRegistry.RemoveAlias(aliasName)
+End Function
+
+Private Function ExpandAliasTokens(ByVal tokens As Collection) As Collection
+    Dim expander As clsAliasExpander
+
+    Set expander = New clsAliasExpander
+    Set ExpandAliasTokens = expander.ExpandTokens(tokens, mAliasRegistry)
+End Function
 
 Public Sub SetEnv(ByVal key As String, ByVal value As String)
     If Not IsValidEnvironmentName(key) Then
@@ -123,6 +149,7 @@ Public Function ProcessInput(ByVal commandLine As String) As String
         Case "for"
             ProcessInput = ExecuteFor(tokens, trimmed)
         Case Else
+            Set tokens = ExpandAliasTokens(tokens)
             Set parser = New clsParser
             Set ast = parser.ParseAst(tokens, trimmed)
             Set executor = New clsAstExecutor
@@ -149,6 +176,7 @@ Private Function ExecuteTokens(ByVal tokens As Collection, ByVal originalText As
     HasErrorOutput = False
     ErrorOutput = ""
     SuppressNewline = False
+    Set tokens = ExpandAliasTokens(tokens)
     Set tokens = ExpandTokens(tokens)
     Set parser = New clsParser
     Set command = parser.Parse(tokens, originalText)
