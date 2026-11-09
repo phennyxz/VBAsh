@@ -1,5 +1,10 @@
 # VBAsh
 
+## Documentação do projeto
+
+Consulte [docs/README.md](docs/README.md) para o índice da documentação, [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) para o estado atual, [docs/BRANCH_STATUS.md](docs/BRANCH_STATUS.md) para o inventário de branches e [docs/DEVELOPMENT_WORKFLOW.md](docs/DEVELOPMENT_WORKFLOW.md) para o fluxo de trabalho e validação.
+
+
 Um shell mínimo implementado em VBA. A versão atual executa builtins fundamentais e mantém diretório atual, variáveis de ambiente e histórico na sessão.
 
 ## Builtins disponíveis
