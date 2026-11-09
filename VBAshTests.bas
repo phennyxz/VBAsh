@@ -3091,7 +3091,7 @@ Private Sub TestAliasBuiltins()
 
     Set session = New clsSession
 
-    output = session.ProcessInput("alias rr=echo ready")
+    output = session.ProcessInput("alias rr=""echo ready""")
     AssertTrue session.HasAlias("rr"), "alias builtin registers a new alias"
     AssertEqual "echo ready", session.GetAlias("rr"), "alias builtin stores the complete replacement"
     AssertEqual 0, session.LastExitCode, "alias registration succeeds"
@@ -3107,7 +3107,7 @@ Private Sub TestAliasBuiltins()
     AssertTrue InStr(1, output, "alias rr='echo ready'", vbBinaryCompare) > 0, _
                "alias without arguments lists registered aliases"
 
-    output = session.ProcessInput("alias rr=echo updated")
+    output = session.ProcessInput("alias rr=""echo updated""")
     AssertEqual "echo updated", session.GetAlias("rr"), "alias builtin replaces an existing definition"
     output = session.ProcessInput("rr")
     AssertEqual "updated", output, "replacement takes effect on the next command"
@@ -3124,7 +3124,9 @@ Private Sub TestAliasBuiltins()
     session.RegisterAlias "one", "echo one"
     session.RegisterAlias "two", "echo two"
     output = session.ProcessInput("unalias -a")
-    AssertEqual 0, session.GetAliasNames().Count, "unalias -a clears the session alias registry"
+    Dim remainingAliases As Collection
+    Set remainingAliases = session.GetAliasNames()
+    AssertEqual 0, remainingAliases.Count, "unalias -a clears the session alias registry"
 
     output = session.ProcessInput("unalias")
     AssertEqual 2, session.LastExitCode, "unalias without operands reports usage error"
