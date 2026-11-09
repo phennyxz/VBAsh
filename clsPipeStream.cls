@@ -41,7 +41,7 @@ Private Property Get IStream_CanWrite() As Boolean
 End Property
 
 Private Property Get IStream_AtEndOfStream() As Boolean
-    IStream_AtEndOfStream = mReaderOpen And mReadPosition > Len(mBuffer)
+    IStream_AtEndOfStream = mReaderOpen And Not mWriterOpen And mReadPosition > Len(mBuffer)
 End Property
 
 Private Property Get IStream_IsClosed() As Boolean
