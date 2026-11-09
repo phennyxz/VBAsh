@@ -216,7 +216,7 @@ O usuário informou execução real em Excel/VBA de `VBAshTests-r5`: 18/18 suít
 | Suítes registradas | 23 |
 | Execução Excel/VBA nesta revisão | NOT RUN |
 | Compilação VBA nesta revisão | NOT RUN |
-| HEAD da branch no momento desta revisão | `590ee89d89fc19d13a37c097c43774c1f64654a6` |
+| HEAD da branch no momento desta revisão | `c52d686a42610e0ec807c2e7090fcb38841841a4` |
 | Commit SHA testado | Não aplicável — ainda não houve compilação nem execução Excel/VBA |
 | Resultado funcional | Pendente |
 
