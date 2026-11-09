@@ -208,6 +208,7 @@ End Function
 
 Private Function ExecuteParsedCommand(ByVal command As clsCommand) As String
     Dim builtin As IBuiltin
+    Dim resolved As clsResolvedCommand
     Dim separator As Long
     Dim scope As clsDescriptorScope
     Dim outputText As String
@@ -254,16 +255,21 @@ Private Function ExecuteParsedCommand(ByVal command As clsCommand) As String
         GoTo BuiltinComplete
     End If
 
-    Set builtin = mBuiltinRegistry.Resolve(command.Name)
-    If builtin Is Nothing Then
-        ErrorOutput = "Command not found: " & command.Name
-        HasErrorOutput = True
-        LastExitCode = 127
-    Else
-        LastExitCode = 0
-        On Error GoTo BuiltinFailure
-        outputText = builtin.Execute(Me, command.Args)
-    End If
+    Set resolved = mBuiltinRegistry.ResolveCommand(command, Me)
+    Select Case resolved.CommandType
+        Case "BUILTIN"
+            Set builtin = resolved.Builtin
+            LastExitCode = 0
+            On Error GoTo BuiltinFailure
+            outputText = builtin.Execute(Me, resolved.Args)
+        Case "UNRESOLVED"
+            ErrorOutput = "Command not found: " & resolved.Name
+            HasErrorOutput = True
+            LastExitCode = 127
+        Case Else
+            Err.Raise vbObjectError + 1333, "clsSession.ExecuteParsedCommand", _
+                      "Tipo de comando ainda não executável: " & resolved.CommandType
+    End Select
 
 BuiltinComplete:
     If Not mDescriptorTable Is Nothing Then
