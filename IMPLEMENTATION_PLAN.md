@@ -189,6 +189,16 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 - `Resolve(commandName) As IBuiltin` permanece compatível com o chamador atual. A API ainda não foi exposta por `clsCommandResolver` nem por `clsSession`; a integração do resolver será uma etapa posterior.
 - A revisão `clsBuiltinRegistry-r1` e a suíte `BuiltinRegistry` foram adicionadas ao runner `VBAshTests-r9`. A execução no Excel ainda depende da validação do usuário.
 
+
+### Integração do resolver — Fase 4C
+
+- `clsCommandResolver.ResolveCommand(sourceNode, sessionContext)` recebe somente nós AST `SIMPLE_COMMAND` já expandidos pela sessão; não repete expansão nem executa comandos.
+- O resolver classifica builtins registrados como `BUILTIN`, preserva a API legada `Resolve(commandName) As IBuiltin` e retorna `UNRESOLVED` para nomes ainda não registrados.
+- O objeto resolvido mantém referência ao nó AST original, copia os argumentos já expandidos e preserva a identidade dos objetos de redirecionamento.
+- `clsSession` passa a consumir o resultado do resolver para executar builtins; comandos `UNRESOLVED` retornam status 127. Nenhum processo externo é iniciado.
+- Aliases, funções e descoberta de executáveis continuam pendentes; a prioridade completa de resolução ainda não está implementada.
+- A suíte `CommandResolver` foi adicionada ao runner `VBAshTests-r10`; a validação de compilação e execução no Excel/VBA depende da importação e do relatório do usuário.
+
 ### Critérios de conclusão
 - O shell consegue classificar um comando em uma de várias categorias.
 - O registry resolve a prioridade correta:
