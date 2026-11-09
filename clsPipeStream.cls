@@ -37,7 +37,7 @@ Private Property Get IStream_CanRead() As Boolean
 End Property
 
 Private Property Get IStream_CanWrite() As Boolean
-    IStream_CanWrite = mWriterOpen
+    IStream_CanWrite = mWriterOpen And mReaderOpen
 End Property
 
 Private Property Get IStream_AtEndOfStream() As Boolean
@@ -74,6 +74,7 @@ End Function
 
 Private Function IStream_WriteText(ByVal text As String) As Long
     If Not mWriterOpen Then RaiseError VBAsh_STREAM_ERROR_CLOSED, "Pipe writer is closed."
+    If Not mReaderOpen Then RaiseError VBAsh_STREAM_ERROR_WRITE_FAILURE, "Pipe reader is closed."
     ClearError
     mBuffer = mBuffer & text
     IStream_WriteText = Len(text)
