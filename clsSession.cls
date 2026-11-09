@@ -16,8 +16,8 @@ Private mPreviousDirectory As String
 Private mBuiltinRegistry As clsCommandResolver
 Private mDescriptorTable As clsFileDescriptorTable
 Private mRedirectionManager As clsRedirectionManager
-Private mStandardOutput As IStream
-Private mStandardError As IStream
+Private mStandardOutput As clsMemoryStream
+Private mStandardError As clsMemoryStream
 
 Private Sub Class_Initialize()
     CurrentDirectory = CurDir$
@@ -35,8 +35,8 @@ Private Sub Class_Initialize()
 End Sub
 
 Public Sub ConfigureDescriptorTable(ByVal table As clsFileDescriptorTable, _
-                                     ByVal standardOutput As IStream, _
-                                     ByVal standardError As IStream)
+                                     ByVal standardOutput As clsMemoryStream, _
+                                     ByVal standardError As clsMemoryStream)
     If table Is Nothing Or standardOutput Is Nothing Or standardError Is Nothing Then
         Err.Raise vbObjectError + 1280, "clsSession.ConfigureDescriptorTable", _
                   "Tabela e streams padrão são obrigatórios."
@@ -89,6 +89,8 @@ Public Function ProcessInput(ByVal commandLine As String) As String
     HasErrorOutput = False
     SuppressNewline = False
     ClearRequested = False
+    If Not mStandardOutput Is Nothing Then mStandardOutput.Initialize "", True, True
+    If Not mStandardError Is Nothing Then mStandardError.Initialize "", True, True
     trimmed = Trim$(commandLine)
     If Len(trimmed) = 0 Then Exit Function
 
