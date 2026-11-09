@@ -3148,6 +3148,14 @@ Private Sub TestFunctionRegistry()
     AssertTrue registry.RemoveFunction("greet"), "registered function can be removed"
     AssertTrue Not registry.HasFunction("greet"), "removed function is absent"
     AssertTrue Not registry.RemoveFunction("greet"), "removing absent function returns False"
+
+    Dim session As clsSession
+    Set session = New clsSession
+    session.RegisterFunction "greet", body
+    AssertTrue session.HasFunction("greet"), "session exposes function registration"
+    Set storedBody = session.GetFunction("greet")
+    AssertTrue storedBody Is body, "session returns the registered function AST"
+    AssertTrue session.RemoveFunction("greet"), "session exposes function removal"
 End Sub
 
 Private Sub TestAliasBuiltins()
