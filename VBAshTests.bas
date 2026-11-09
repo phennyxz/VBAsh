@@ -1632,6 +1632,18 @@ Private Sub TestDescriptorRedirection()
     AssertTrue session.HasErrorOutput, "stdout-to-stderr duplication is visible on stderr channel"
     AssertEqual "routed", session.ErrorOutput, "stdout-to-stderr duplication preserves output text"
 
+    result = session.ProcessInput("pwd extra 2>&1")
+    AssertEqual "VBAsh: Uso: pwd", result, "stderr-to-stdout duplication returns merged text on stdout"
+    AssertTrue Not session.HasErrorOutput, "2>&1 clears the separate stderr channel"
+
+    result = session.ProcessInput("pwd extra 2>&-")
+    AssertEqual 1, session.LastExitCode, "closed stderr descriptor reports an output failure"
+    AssertTrue Not session.HasErrorOutput, "closed stderr suppresses the error channel"
+
+    result = session.ProcessInput("echo discarded > /dev/null")
+    AssertEqual 0, session.LastExitCode, "null redirection preserves successful status"
+    AssertTrue Not session.HasOutput, "null stream discards redirected stdout"
+
     table.SetDescriptor 3, stdoutStream
     result = session.ProcessInput("echo duplicated 1>&3")
     AssertEqual "duplicated", result, "multi-digit-capable descriptor duplication routes stdout through FD 3"
