@@ -207,14 +207,15 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 - Palavras de argumentos e destinos de redirecionamento não são expandidos. Redirecionamentos anteriores ao nome do comando são aceitos pelo parser para permitir > arquivo alias.
 - O texto de substituição pode introduzir várias palavras; os argumentos originais permanecem depois dos tokens introduzidos.
 - A recursão é protegida por uma pilha de aliases ativos e limite de profundidade. Auto-referências e ciclos terminam emitindo literalmente o alias já ativo, evitando expansão infinita.
-- A sessão expõe RegisterAlias, HasAlias, GetAlias e RemoveAlias. Não há ainda builtin alias/unalias, aliases com valor terminado em espaço, funções, comandos externos ou execução de pipelines.
+- A sessão expõe RegisterAlias, HasAlias, GetAlias, RemoveAlias, GetAliasNames e ClearAliases. Os builtins `alias` e `unalias` são registrados por padrão: `alias NOME=VALOR` cria/substitui, `alias NOME` consulta, `alias` lista, `unalias NOME` remove e `unalias -a` limpa a tabela. Aliases com valor terminado em espaço, funções, comandos externos e execução de pipelines continuam fora desta entrega.
 - A expansão lexical de NOME=valor permite reconhecer o próximo nome de comando para alias, mas a semântica de atribuições prefixadas ainda não foi implementada no parser/executor.
-- A suíte AliasExpansion foi adicionada ao runner VBAshTests-r11 e cobre registry, expansão em posições de comando, argumentos, operadores, redirecionamentos, aspas, atribuições prefixadas, aliases vazios, auto-referência/ciclos e integração com a sessão. A validação no Excel/VBA ainda depende da importação e execução do runner atualizado.
+- A suíte AliasExpansion foi adicionada ao runner VBAshTests-r11 e cobre registry, expansão em posições de comando, argumentos, operadores, redirecionamentos, aspas, atribuições prefixadas, aliases vazios, auto-referência/ciclos e integração com a sessão. A suíte AliasBuiltins foi adicionada ao runner VBAshTests-r12 e cobre cadastro, consulta, listagem, substituição, expansão executada pelo terminal, remoção e limpeza. A validação no Excel/VBA depende da importação e execução do runner r12.
 
 ### Critérios de conclusão
-- O shell consegue classificar um comando em uma de várias categorias.
+- O shell consegue classificar builtins e manter um resultado de resolução separado da AST.
 - A expansão lexical de aliases ocorre antes da AST e, portanto, antes da resolução de comandos.
-- A resolução pós-AST deverá respeitar a prioridade entre função, builtin e executável externo.
+- Os aliases podem ser criados, consultados, listados e removidos pelos builtins `alias` e `unalias`.
+- A resolução pós-AST deverá respeitar a prioridade entre função, builtin e executável externo quando os registries de funções e o resolvedor de executáveis forem introduzidos nas fases que fornecem essas capacidades.
 - Comandos sem nome não são aceitos.
 - O objeto CCommand armazena nome, Args, redireções, contexto e tipo.
 - A resolução é separada da execução.
@@ -224,11 +225,12 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 - Teste 2: builtin registrado é reconhecido corretamente.
 - Teste 3: função registrada é resolvida antes de executável.
 - Teste 4: alias registrado é expandido antes da AST e o nome resultante segue para a resolução pós-AST.
-- Teste 5: comando vazio retorna erro sem quebrar shell.
+- Teste 5: `alias NOME=VALOR`, `alias NOME`, `alias`, `unalias NOME` e `unalias -a` operam sobre o registry da sessão.
+- Teste 6: comando vazio retorna erro sem quebrar shell.
 
 ---
 
-## Fase 5 — Lexer
+### Validação Excel — Fase 4D (2026-11-09)\n\n- Runner: `VBAshTests-r11`.\n- Resultado: 27/27 suítes PASS; 933 asserções; 0 FAIL; 0 ERROR.\n- `AliasExpansion`: 41 asserções PASS.\n- Módulos de sessão/parser identificados como `clsSession-r5` e `clsParser-r3`; registry/expansor novos não foram listados no relatório.\n- Checkout/commit UNKNOWN e correspondência checkout/módulos UNVERIFIED.\n- Conclusão: expansão lexical e integração de aliases funcionalmente validadas; interface de terminal `alias`/`unalias` ainda não estava implementada nesta validação.\n\n## Fase 5 — Lexer
 
 ### Objetivo
 Implementar a análise léxica do shell, convertendo texto em tokens compreensíveis para o parser.
@@ -530,3 +532,4 @@ Este plano foi desenhado para evoluir de forma incremental, sem overengineering 
 - Integridade: checkout/commit UNKNOWN e correspondência checkout/módulos UNVERIFIED. A validação comprova as revisões identificadas no projeto VBA carregado, mas não vincula o workbook a um commit Git específico.
 - Conclusão: Fase 4C funcionalmente validada no Excel, com a ressalva de identidade do checkout.
 
+\n\n### Implementação de interface de aliases — Fase 4E (em validação)\n\n- `clsBuiltinAlias` e `clsBuiltinUnalias` conectam a sintaxe de terminal ao registry da sessão.\n- `alias NOME=VALOR` cria ou substitui; `alias NOME` consulta; `alias` lista. `unalias NOME` remove e `unalias -a` limpa todos.\n- O registry e a sessão expõem enumeração e limpeza; o instalador inclui os dois novos módulos na lista de limpeza legada.\n- O runner `VBAshTests-r12` acrescenta `AliasBuiltins`, incluindo fluxo real por `ProcessInput`.\n- A implementação ainda precisa ser importada/compilada e executada no Excel/VBA; só então a Fase 4 poderá ser fechada funcionalmente.\n
