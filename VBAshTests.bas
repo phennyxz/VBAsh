@@ -3154,6 +3154,16 @@ Private Sub TestAliasExpansion()
     AssertEqual "echo", CStr(expanded(2).Value), _
                 "alias expands after an assignment prefix"
 
+    Set tokens = tokenizer.Tokenize("VAR='x y' ll")
+    Set expanded = expander.ExpandTokens(tokens, registry)
+    AssertEqual "echo", CStr(expanded(2).Value), _
+                "assignment prefix with a quoted value still permits command alias expansion"
+
+    Set tokens = tokenizer.Tokenize("'VAR'=value ll")
+    Set expanded = expander.ExpandTokens(tokens, registry)
+    AssertEqual "ll", CStr(expanded(2).Value), _
+                "quoted assignment name is not treated as an assignment prefix"
+
     registry.RegisterAlias "self", "self --flag"
     Set tokens = tokenizer.Tokenize("self")
     Set expanded = expander.ExpandTokens(tokens, registry)
