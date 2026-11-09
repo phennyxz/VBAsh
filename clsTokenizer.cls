@@ -6,6 +6,9 @@ Private mLen As Long
 
 Public Function Tokenize(ByVal sourceText As String) As Collection
     Dim resultTokens As Collection
+    Dim descriptorEnd As Long
+    Dim descriptorSource As String
+    Dim descriptorOperator As String
 
     Set resultTokens = New Collection
     mSource = sourceText
@@ -33,9 +36,6 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
 
         ' Generic descriptor duplication/closure: n>&m and n>&-.
         If ch >= "0" And ch <= "9" Then
-            Dim descriptorEnd As Long
-            Dim descriptorSource As String
-            Dim descriptorOperator As String
             descriptorEnd = mIndex
             Do While descriptorEnd <= mLen
                 ch = Mid$(mSource, descriptorEnd, 1)
@@ -57,6 +57,7 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
                 End If
             End If
         End If
+        ch = Mid$(mSource, mIndex, 1)
 
         If Mid$(mSource, mIndex, 4) = "2>&1" Then
             AddToken resultTokens, "REDIR_ERR_TO_OUT", "2>&1"
