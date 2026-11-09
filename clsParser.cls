@@ -1,13 +1,14 @@
 ' @VBAshRevision clsParser-r2
 Option Explicit
 
+Private mTokens As Collection
+Private mOriginalText As String
+Private mIndex As Long
+
 Public Property Get ModuleRevision() As String
     ModuleRevision = "clsParser-r2"
 End Property
 
-Private mTokens As Collection
-Private mOriginalText As String
-Private mIndex As Long
 
 Public Function Parse(ByVal tokens As Collection, ByVal originalText As String) As clsCommand
     Dim root As clsCommand
