@@ -2966,6 +2966,8 @@ Private Sub TestCommandResolver()
     Dim session As clsSession
     Dim redirection As clsRedirection
     Dim storedRedirection As clsRedirection
+    Dim functionBody As clsCommand
+    Dim externalPath As String
 
     Set resolver = New clsCommandResolver
     Set session = New clsSession
@@ -2988,9 +2990,6 @@ Private Sub TestCommandResolver()
     Set storedRedirection = resolved.Redirections(1)
     AssertTrue storedRedirection Is redirection, "resolver preserves redirection object identity"
     AssertTrue Not (resolved.Builtin Is Nothing), "builtin resolution supplies implementation"
-
-    Dim functionBody As clsCommand
-    Dim externalPath As String
 
     Set functionBody = New clsCommand
     functionBody.Init "echo", "echo function-body"
@@ -3032,6 +3031,8 @@ Private Sub TestBuiltinRegistry()
 
     Set registry = New clsBuiltinRegistry
     AssertTrue registry.HasBuiltin("echo"), "default echo builtin is registered"
+    AssertTrue registry.HasBuiltin("alias"), "alias builtin is registered by default"
+    AssertTrue registry.HasBuiltin("unalias"), "unalias builtin is registered by default"
     AssertTrue registry.HasBuiltin("ECHO"), "builtin lookup is case insensitive"
     AssertTrue Not registry.HasBuiltin("custom-command"), "unknown builtin is absent"
 
@@ -3152,6 +3153,7 @@ End Sub
 Private Sub TestAliasBuiltins()
     Dim session As clsSession
     Dim output As String
+    Dim remainingAliases As Collection
 
     Set session = New clsSession
 
@@ -3188,7 +3190,6 @@ Private Sub TestAliasBuiltins()
     session.RegisterAlias "one", "echo one"
     session.RegisterAlias "two", "echo two"
     output = session.ProcessInput("unalias -a")
-    Dim remainingAliases As Collection
     Set remainingAliases = session.GetAliasNames()
     AssertEqual 0, remainingAliases.Count, "unalias -a clears the session alias registry"
 
