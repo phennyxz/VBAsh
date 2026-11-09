@@ -1,4 +1,4 @@
-' @VBAshRevision clsBuiltinRegistry-r1
+' @VBAshRevision clsBuiltinRegistry-r2
 Option Explicit
 
 Private mBuiltins As Object
@@ -35,10 +35,14 @@ Private Sub Class_Initialize()
     Register "clear", builtin
     Set builtin = New clsBuiltinBracketTest
     Register "[", builtin
+    Set builtin = New clsBuiltinAlias
+    Register "alias", builtin
+    Set builtin = New clsBuiltinUnalias
+    Register "unalias", builtin
 End Sub
 
 Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsBuiltinRegistry-r1"
+    ModuleRevision = "clsBuiltinRegistry-r2"
 End Property
 
 Private Sub Register(ByVal name As String, ByVal builtin As IBuiltin)
