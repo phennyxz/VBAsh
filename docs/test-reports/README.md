@@ -9,7 +9,7 @@ Use `phase-<slug>` para o diretório de cada fase, com o slug baseado no nome ad
 | Fase | Referência | Execução | Estado |
 |---|---|---|---|
 | Pipelines | `phase-pipelines/test-reference.md` | `phase-pipelines/execution-log.md` | Aguardando registro formal |
-| Streams | `phase-streams/test-reference.md` | `phase-streams/execution-log.md` | Execução informada (17/17 PASS); fase ainda incompleta devido às lacunas abertas |
+| Streams | `phase-streams/test-reference.md` | `phase-streams/execution-log.md` | Histórico por fase precisa ser reconciliado; regressão integrada mais recente registrada no r14 (29/29 PASS), com limitações de rastreabilidade |
 | Command Registry (Fase 4) | `VBAshTests.bas` (runner `VBAshTests-r14`) | `phase-4-command-registry-r14.md` | 29/29 PASS; SHA exato do checkout não identificado |
 
 Uma fase só deve ser declarada aprovada quando houver evidência de execução e rastreabilidade suficientes. Um relato fornecido por uma pessoa deve ser identificado como tal, sem apresentá-lo como execução verificada independentemente.
@@ -44,6 +44,8 @@ Use o estado para descrever o que de fato ocorreu. Validação estática, teste 
 5. Após qualquer alteração de testes ou comportamento, atualize a referência junto com a implementação e registre o SHA exato usado na execução.
 
 ## Escopo e evidência atual
+
+A execução integrada mais recente disponível neste snapshot é `phase-4-command-registry-r14.md`. Ela também registra regressão das suítes de tokenizer, parser/AST e streams. Os arquivos históricos `phase-streams/test-reference.md` e `phase-streams/execution-log.md` ainda contêm entradas de marcos anteriores (r3–r7); não interpretar uma entrada antiga NOT RUN como se anulasse a execução posterior r14, nem assumir que o r14 cobre requisitos de integração que não aparecem em suas suítes. A reconciliação requisito-a-teste da Fase 3 permanece uma tarefa documental.
 
 As referências desta estrutura descrevem o que foi possível identificar no snapshot consultado. Os relatórios recebidos sem arquivos de teste, nomes de suítes ou SHA são preservados como relatos informados, não completados por inferência.
 
