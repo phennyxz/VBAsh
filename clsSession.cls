@@ -1,10 +1,6 @@
 ' @VBAshRevision clsSession-r2
 Option Explicit
 
-Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsSession-r2"
-End Property
-
 Public CurrentDirectory As String
 Public Env As Object
 Public History As Collection
@@ -24,6 +20,11 @@ Private mRedirectionManager As clsRedirectionManager
 Private mStandardOutput As clsConsoleStream
 Private mStandardError As clsConsoleStream
 Private mPendingDescriptorScope As clsDescriptorScope
+
+Public Property Get ModuleRevision() As String
+    ModuleRevision = "clsSession-r2"
+End Property
+
 
 Private Sub Class_Initialize()
     CurrentDirectory = CurDir$
