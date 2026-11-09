@@ -303,11 +303,7 @@ Public Sub RestoreDescriptorScope(ByVal scope As clsDescriptorScope)
     For index = 1 To scope.EntryCount
         Set entry = scope.GetEntry(index)
         If Not entry.RestoreCompleted Then
-            If mDescriptors.Exists(CStr(entry.Descriptor)) Then
-                SetDescriptor entry.Descriptor, entry.SavedStream, False
-            Else
-                SetDescriptor entry.Descriptor, entry.SavedStream, False
-            End If
+            SetDescriptor entry.Descriptor, entry.SavedStream, False
             entry.RestoreCompleted = True
         End If
     Next index
