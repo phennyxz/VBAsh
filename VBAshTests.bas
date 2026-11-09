@@ -1496,7 +1496,7 @@ Private Sub TestDescriptorScopes()
     Err.Clear
     On Error GoTo 0
     AssertTrue errorNumber <> 0, "CloseAll rejects active descriptor scopes"
-    AssertTrue Not originalStream.IsClosed, "snapshot pins preserve the original owned stream"
+    AssertTrue Not DescriptorStreamIsClosed(originalStream), "snapshot pins preserve the original owned stream"
 
     Set nestedScope = table.BeginDescriptorScope
     On Error Resume Next
@@ -1511,7 +1511,7 @@ Private Sub TestDescriptorScopes()
     Set stream = table.GetDescriptor(3)
     AssertTrue stream Is originalStream, "scope restores original descriptor identity"
     AssertTrue originalStream.CanRead, "restored original stream remains usable"
-    AssertTrue temporaryStream.IsClosed, "owned temporary stream closes after restoration"
+    AssertTrue DescriptorStreamIsClosed(temporaryStream), "owned temporary stream closes after restoration"
     AssertTrue Not table.HasDescriptor(4), "descriptor created inside scope is removed"
 End Sub
 
