@@ -30,21 +30,30 @@ Public Sub RegisterAlias(ByVal aliasName As String, ByVal replacementText As Str
 End Sub
 
 Public Function HasAlias(ByVal aliasName As String) As Boolean
-    If Len(aliasName) = 0 Then Exit Function
-    HasAlias = mAliases.Exists(aliasName)
+    Dim normalizedName As String
+
+    normalizedName = Trim$(aliasName)
+    If Len(normalizedName) = 0 Then Exit Function
+    HasAlias = mAliases.Exists(normalizedName)
 End Function
 
 Public Function ResolveAlias(ByVal aliasName As String) As String
-    If mAliases.Exists(aliasName) Then
-        ResolveAlias = CStr(mAliases(aliasName))
+    Dim normalizedName As String
+
+    normalizedName = Trim$(aliasName)
+    If mAliases.Exists(normalizedName) Then
+        ResolveAlias = CStr(mAliases(normalizedName))
     End If
 End Function
 
 Public Function RemoveAlias(ByVal aliasName As String) As Boolean
-    If Len(aliasName) = 0 Then Exit Function
-    If Not mAliases.Exists(aliasName) Then Exit Function
+    Dim normalizedName As String
 
-    mAliases.Remove aliasName
+    normalizedName = Trim$(aliasName)
+    If Len(normalizedName) = 0 Then Exit Function
+    If Not mAliases.Exists(normalizedName) Then Exit Function
+
+    mAliases.Remove normalizedName
     RemoveAlias = True
 End Function
 
