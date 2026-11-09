@@ -178,6 +178,9 @@ Private Function IsAssignmentWord(ByVal token As clsToken) As Boolean
     Dim sourcePosition As Long
     Dim equalsIsUnquoted As Boolean
 
+    If token.Segments Is Nothing Then Exit Function
+    If token.Segments.Count = 0 Then Exit Function
+
     separator = InStr(1, token.Value, "=", vbBinaryCompare)
     If separator <= 1 Then Exit Function
     namePart = Left$(token.Value, separator - 1)
