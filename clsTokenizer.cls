@@ -7,6 +7,7 @@ Private mLen As Long
 Public Function Tokenize(ByVal sourceText As String) As Collection
     Dim resultTokens As Collection
     Dim descriptorEnd As Long
+    Dim descriptorSourceEnd As Long
     Dim descriptorSource As String
     Dim descriptorOperator As String
 
@@ -45,16 +46,24 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
                 descriptorEnd = descriptorEnd + 1
             Loop
             If Mid$(mSource, descriptorEnd, 2) = ">&" Then
-                descriptorSource = Mid$(mSource, descriptorEnd + 2, 1)
-                If (descriptorSource >= "0" And descriptorSource <= "9") Or descriptorSource = "-" Then
-                    If descriptorSource = "-" Then
-                        descriptorOperator = "REDIR_FD_CLOSE"
-                    Else
-                        descriptorOperator = "REDIR_FD_DUP"
-                    End If
+                descriptorSourceEnd = descriptorEnd + 2
+                descriptorSource = Mid$(mSource, descriptorSourceEnd, 1)
+                If descriptorSource = "-" Then
+                    descriptorOperator = "REDIR_FD_CLOSE"
                     AddToken resultTokens, descriptorOperator, _
-                             Mid$(mSource, mIndex, descriptorEnd + 2 - mIndex) & descriptorSource
-                    mIndex = descriptorEnd + 3
+                             Mid$(mSource, mIndex, descriptorSourceEnd - mIndex + 1)
+                    mIndex = descriptorSourceEnd + 1
+                    GoTo ContinueLoop
+                ElseIf descriptorSource >= "0" And descriptorSource <= "9" Then
+                    Do While descriptorSourceEnd <= mLen
+                        descriptorSource = Mid$(mSource, descriptorSourceEnd, 1)
+                        If descriptorSource < "0" Or descriptorSource > "9" Then Exit Do
+                        descriptorSourceEnd = descriptorSourceEnd + 1
+                    Loop
+                    descriptorOperator = "REDIR_FD_DUP"
+                    AddToken resultTokens, descriptorOperator, _
+                             Mid$(mSource, mIndex, descriptorSourceEnd - mIndex)
+                    mIndex = descriptorSourceEnd
                     GoTo ContinueLoop
                 End If
             End If
