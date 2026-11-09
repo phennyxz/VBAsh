@@ -1,4 +1,4 @@
-' @VBAshRevision clsSession-r6
+' @VBAshRevision clsSession-r7
 Option Explicit
 
 Public CurrentDirectory As String
@@ -23,7 +23,7 @@ Private mStandardError As clsConsoleStream
 Private mPendingDescriptorScope As clsDescriptorScope
 
 Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsSession-r6"
+    ModuleRevision = "clsSession-r7"
 End Property
 
 
@@ -86,6 +86,23 @@ End Function
 Public Sub ClearAliases()
     mAliasRegistry.ClearAliases
 End Sub
+
+Public Sub RegisterFunction(ByVal functionName As String, ByVal functionBody As clsCommand, _
+                             Optional ByVal replaceExisting As Boolean = False)
+    mBuiltinRegistry.RegisterFunction functionName, functionBody, replaceExisting
+End Sub
+
+Public Function HasFunction(ByVal functionName As String) As Boolean
+    HasFunction = mBuiltinRegistry.HasFunction(functionName)
+End Function
+
+Public Function GetFunction(ByVal functionName As String) As clsCommand
+    Set GetFunction = mBuiltinRegistry.GetFunction(functionName)
+End Function
+
+Public Function RemoveFunction(ByVal functionName As String) As Boolean
+    RemoveFunction = mBuiltinRegistry.RemoveFunction(functionName)
+End Function
 
 Private Function ExpandAliasTokens(ByVal tokens As Collection) As Collection
     Dim expander As clsAliasExpander
@@ -298,10 +315,22 @@ Private Function ExecuteParsedCommand(ByVal command As clsCommand) As String
             LastExitCode = 0
             On Error GoTo BuiltinFailure
             outputText = builtin.Execute(Me, resolved.Args)
+        Case "FUNCTION"
+            ErrorOutput = "Function resolved but execution is not implemented yet: " & resolved.Name
+            HasErrorOutput = True
+            LastExitCode = 126
+        Case "EXTERNAL"
+            ErrorOutput = "External command resolved but process execution is not implemented yet: " & _
+                          resolved.ExecutablePath
+            HasErrorOutput = True
+            LastExitCode = 126
         Case "UNRESOLVED"
             ErrorOutput = "Command not found: " & resolved.Name
             HasErrorOutput = True
             LastExitCode = 127
+        Case "COMPOUND"
+            Err.Raise vbObjectError + 1334, "clsSession.ExecuteParsedCommand", _
+                      "Nó composto não pode ser executado como comando simples."
         Case Else
             Err.Raise vbObjectError + 1333, "clsSession.ExecuteParsedCommand", _
                       "Tipo de comando ainda não executável: " & resolved.CommandType
