@@ -1,64 +1,73 @@
-# VBAsh — Inventário de branches
+# VBAsh — Estratégia de branches
 
-**Data da consulta:** 2026-11-09 (após a primeira rodada de organização documental)  
+**Data da decisão:** 2026-11-09  
 **Repositório:** phennyxz/VBAsh  
-**main na consulta:** 0d4115f4ced6f3772fa38182a71a34fdfee387ce  
-**Branch ativa após os commits documentais:** 155 commits à frente de main, 0 atrás
+**Linha evolutiva canônica atual:** feature/phase-3-integration
 
-Esta é uma fotografia remota. Status de branch pode mudar; repetir a comparação antes de qualquer exclusão ou merge. “Atrás” e “à frente” são contagens da comparação com main, não uma avaliação de qualidade.
+## Decisão de projeto
 
-## Branch de trabalho preservada
+O VBAsh tem uma única linha evolutiva de desenvolvimento. A branch feature/phase-3-integration contém o produto em construção e é a referência efetiva para implementação, testes e documentação.
 
-| Branch | Comparação com main | Leitura |
-|---|---:|---|
-| feature/phase-3-integration | 155 à frente, 0 atrás | Branch ativa de referência. Contém o estado mais recente usado para o r14 e o trabalho das Fases 3/4. Preservar. |
+A branch main não representa uma versão funcional alternativa nem uma linha estável deliberadamente mantida. É uma referência histórica anterior, atualmente atrasada em relação ao desenvolvimento real. Não usar main como base, destino de PR ou critério para decidir qual implementação é mais atual.
 
-A comparação após a organização documental aponta 155 commits à frente de main e 0 atrás. O conjunto de arquivos divergentes inclui tokenizer, parser, sessão, registry, aliases, streams e a documentação de governança recém-adicionada. O SHA do HEAD desta branch não foi exposto pelo resultado da comparação; consultar localmente com git rev-parse HEAD antes de criar uma branch de trabalho ou registrar execução.
+Não manter branches permanentes por fase, subsistema ou ferramenta. Branches antigas integradas ou cujo trabalho foi superado não têm função operacional. O histórico dos commits permanece no repositório mesmo após excluir referências de branches.
 
-## Branches cujo conteúdo está contido em main
+## Inventário observado em 2026-11-09
 
-| Branch | Estado relativo a main | Evidência de histórico | Decisão |
-|---|---|---|---|
-| work | 0 à frente, 34 atrás; ponta identificada pelo merge-base 56be9084a7a97b36bf052acda139c8af188a078b | PR #2 integrado | Candidata a exclusão após confirmar que não há checkout local dependente |
-| feature/vbash-pipelines | 0 à frente, 6 atrás; ponta 2b9ea25f4e93c7a481b63a1cee7bed3c669a6bb6 | PR #11 integrado | Candidata a exclusão após confirmar checkout local |
-| feature/descriptor-table | 0 à frente, 1 atrás; ponta 4e50829898bef8592c5bb61573059afb40676105 | PR #12 integrado | Candidata a exclusão após confirmar checkout local |
-| copilot/featurevbash-pipelines-again | 0 à frente, 15 atrás; merge-base cde73a117c82267d8e953654c81b1f2539caa99d | Sem delta exclusivo observado na comparação com main | Candidata a exclusão após conferência |
-| copilot/featurevbash-nullstream | 0 à frente, 16 atrás; ponta 12ddf1de2e54119f50198975c2703e6f993a284e | PR #10 integrado | Candidata a exclusão após confirmar checkout local |
-| copilot/featurefile-stream | 0 à frente, 15 atrás; merge-base cde73a117c82267d8e953654c81b1f2539caa99d | Sem delta exclusivo observado na comparação com main | Candidata a exclusão após conferência |
-| copilot/copilotsetup-audit-vbash-repo | 0 à frente, 34 atrás; merge-base 56be9084a7a97b36bf052acda139c8af188a078b | Relacionada ao histórico antigo de work | Candidata a exclusão após conferência |
-
-“Contido em main” significa que a comparação não encontrou commits exclusivos à branch; não significa que o trabalho local de alguém esteja salvo ou que a branch deva ser apagada automaticamente.
-
-## Branches que exigem preservação/conferência
-
-| Branch | Resultado | Decisão |
+| Branch | Situação observada | Decisão de manutenção |
 |---|---|---|
-| copilot/featurevbash-pipelines | Divergente: 1 commit exclusivo e 15 commits atrás de main; a comparação isolada encontrou apenas alteração em VBAshTests.bas (2 adições/2 remoções) | Não apagar até inspecionar o commit exclusivo e confirmar se a alteração foi superada pelo runner r14 |
-| copilot/vbash-read-only-audit | A branch apareceu na listagem, mas a comparação retornou HTTP 404 | Estado não resolvido; não apagar nem usar como base sem nova consulta |
+| feature/phase-3-integration | Linha evolutiva mais recente; contém o estado de referência do projeto e o relatório r14 | **Preservar como linha canônica até eventual renomeação para main** |
+| main | Referência histórica atrasada; não é produto funcional independente | Não usar para desenvolvimento. Recomenda-se renomear a linha canônica para main e remover a referência antiga depois de ajustar a branch padrão |
+| work | Histórico antigo integrado pelo PR #2; sem papel na linha atual | Excluir |
+| feature/vbash-pipelines | Histórico integrado pelo PR #11; sem papel na linha atual | Excluir |
+| feature/descriptor-table | Histórico integrado pelo PR #12; sem papel na linha atual | Excluir |
+| copilot/featurevbash-pipelines | Divergência exclusiva em VBAshTests.bas; alteração não é necessária para a linha canônica conforme decisão atual do projeto | Excluir |
+| copilot/featurevbash-pipelines-again | Trabalho antigo/superado; sem papel na linha atual | Excluir |
+| copilot/featurevbash-nullstream | Histórico integrado pelo PR #10; sem papel na linha atual | Excluir |
+| copilot/featurefile-stream | Trabalho antigo/superado; sem papel na linha atual | Excluir |
+| copilot/copilotsetup-audit-vbash-repo | Trabalho antigo de configuração/auditoria; sem papel na linha atual | Excluir |
+| copilot/vbash-read-only-audit | Consulta retornou 404; referência não resolvida | Excluir se ainda existir e após confirmar o nome exato |
 
-## Política para o próximo ciclo
+A decisão de excluir branches não apaga commits do histórico Git. Antes da exclusão remota, sincronizar o clone local e confirmar que não há trabalho local não publicado que se queira preservar. A decisão do projeto é que essas linhas não precisam ser mantidas.
 
-1. Manter main como branch estável; não enviar trabalho experimental diretamente para ela.
-2. Usar feature/phase-3-integration como base de integração enquanto esse for o branch de trabalho ativo. O nome é histórico e já não descreve todo o conteúdo.
-3. Criar uma branch curta por tarefa, sempre a partir da ponta atual da branch de integração.
-4. Integrar a tarefa de volta por PR para feature/phase-3-integration, após revisão e teste.
-5. Só promover para main em um marco coerente, com PR que descreva o conjunto de mudanças e as evidências.
-6. Branches Copilot devem ser temporárias e específicas de uma tarefa; não são branches de integração.
-7. Antes de excluir uma branch: comparar com a base, verificar commits exclusivos, conferir PR associado e confirmar que não há trabalho local não publicado.
-8. Não fazer force-push nem apagar branches como parte de uma simples limpeza documental.
+## Modelo operacional desejado
 
-## Comandos locais para reconciliação
+1. Uma única branch de desenvolvimento: a linha evolutiva canônica.
+2. Commits pequenos, descritivos e frequentes diretamente nessa linha.
+3. Não abrir PR para integrar trabalho rotineiro dentro do mesmo repositório.
+4. Branch temporária só quando uma experiência realmente precisar ser isolada; ao terminar, integrar ou descartar e apagar a branch.
+5. Copilot deve trabalhar na branch canônica, quando possível, e não deixar branches automáticas como linhas permanentes.
+6. Não usar main antiga como referência de implementação. A branch canônica atual é a fonte de verdade.
+7. Manter tags/releases para marcos versionados, em vez de conservar branches antigas.
+8. Testes devem registrar SHA exato do código e revisões dos módulos efetivamente carregados no Excel.
 
-Executar no clone local antes de iniciar o próximo trabalho:
+## Transição técnica recomendada
+
+A normalização ideal é renomear feature/phase-3-integration para main, tornando a linha evolutiva atual a branch principal convencional. Isso exige atualizar a branch padrão do GitHub e verificar referências locais, links, automações e configurações antes da renomeação.
+
+A integração GitHub disponível nesta sessão permite ler branches e atualizar arquivos, mas não expõe operações administrativas de renomear/excluir branches nem alterar a branch padrão. Portanto, esta documentação registra a decisão; não afirma que as referências remotas já foram removidas ou renomeadas.
+
+## Reconciliação local
+
+Antes de limpar as referências remotas:
 
 ```bash
 git fetch --all --prune
 git status --short --branch
 git branch -vv
-git log --oneline --decorate --graph --all -40
+git log --oneline --decorate --graph --all -50
 git rev-parse HEAD
-git rev-parse feature/phase-3-integration
-git rev-parse main
+git rev-parse origin/feature/phase-3-integration
+git rev-parse origin/main
 ```
 
-Guardar a saída junto ao registro da tarefa. Se o clone local não tiver a branch remota atualizada, não presumir que o HEAD local representa o remoto.
+Depois de confirmar que o trabalho local está preservado, a limpeza de referências locais pode ser feita com:
+
+```bash
+git branch -D work feature/vbash-pipelines feature/descriptor-table
+git branch -D copilot/featurevbash-pipelines copilot/featurevbash-pipelines-again
+git branch -D copilot/featurevbash-nullstream copilot/featurefile-stream
+git branch -D copilot/copilotsetup-audit-vbash-repo
+```
+
+Não executar esses comandos cegamente: primeiro verificar se alguma branch local contém commits não publicados que o usuário deseje guardar. A remoção remota e a troca da branch padrão devem ser feitas nas configurações/controles administrativos do GitHub, após a linha canônica ser estabelecida como padrão.
