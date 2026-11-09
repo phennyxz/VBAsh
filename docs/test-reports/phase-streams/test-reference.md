@@ -33,3 +33,23 @@ As linhas `STR-GAP-*` indicam cobertura ausente ou parcial conforme descrito em 
 ## Identificação de versão
 
 Todo relatório gerado pelo runner identifica o checkout (quando disponível), as revisões dos módulos carregados e inclui detalhes de falha com número da assertion por suíte. Numeração de assertions só é comparável dentro da mesma revisão de `VBAshTests`; a execução informada da tabela usou `VBAshTests-r5`, enquanto a suíte nova está no runner `VBAshTests-r6`. Isso não prova qual checkout originou módulos carregados em execuções anteriores. Detalhes em `docs/test-reports/README.md`.
+
+
+## Integração por descritores — revisão em desenvolvimento
+
+O runner `VBAshTests-r7` registra 23 suítes. As novas suítes abaixo foram adicionadas à fonte, mas ainda não foram compiladas nem executadas no Excel/VBA. Não confundir sua presença no runner com resultado PASS.
+
+| ID | Suíte | Procedimento | Cobertura adicionada | Estado |
+|---|---|---|---|---|
+| STR-SCOPE-01 | DescriptorScopes | TestDescriptorScopes | Snapshot de bindings, pin por identidade, restauração LIFO, remoção de FDs criados no escopo e bloqueio de CloseAll enquanto há escopos ativos | NOT RUN |
+| STR-REDIR-01 | DescriptorRedirection | TestDescriptorRedirection | Integração real de sessão/tabela para `>`, `2>` e `1>&2`; valida arquivo, canais visíveis e restauração | NOT RUN |
+| STR-CONSOLE-01 | ConsoleStream | TestConsoleStream | Adaptador de captura textual usado nos FDs padrão do host, reset e fechamento | NOT RUN |
+| STR-PIPE-01 | PipeStream | TestPipeStream | Buffer textual, consumo parcial, fechamento do writer, drenagem e EOF | NOT RUN |
+
+A suíte de integração usa streams padrão explícitos e chama `ConfigureDescriptorTable`; as suítes antigas de redirecionamento continuam exercitando o caminho de compatibilidade da sessão sem tabela configurada. A correspondência entre os módulos instalados e a revisão testada deve ser confirmada pelo relatório r7.
+
+Limitações que permanecem fora da cobertura funcional desta fase:
+- stdin do host é um stream nulo em EOF; não há leitura interativa do formulário.
+- `< arquivo` associa o stream de leitura ao FD 0, mas os builtins atuais não leem esse FD.
+- `clsPipeStream` é um buffer textual, sem scheduler, bloqueio, endpoint/processo independente ou execução de pipeline.
+- O retorno dos builtins como strings impede saída incremental e reconstrução da ordem temporal de escrita entre stdout e stderr.
