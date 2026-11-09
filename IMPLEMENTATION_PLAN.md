@@ -564,10 +564,10 @@ Este plano foi desenhado para evoluir de forma incremental, sem overengineering 
 
 - `clsBuiltinAlias` e `clsBuiltinUnalias` foram adicionados e registrados em `clsBuiltinRegistry-r2`.
 - `alias NOME=VALOR` cria/substitui; `alias NOME` consulta; `alias` lista; `unalias NOME` remove; `unalias -a` limpa todos.
-- `clsAliasRegistry-r2` e `clsSession-r8` expõem listagem/limpeza de aliases, funções e extensão do registry de builtins.
+- `clsAliasRegistry-r2` e `clsSession-r8` expõem listagem/limpeza de aliases, registro/remoção de funções e extensão do registry de builtins.
 - `clsFunctionRegistry-r1` registra corpos AST de funções e `clsExternalCommandResolver-r1` procura executáveis no PATH/PATHEXT.
 - `clsCommandResolver-r3` aplica FUNCTION → BUILTIN → EXTERNAL, classifica nós não simples como COMPOUND e mantém UNRESOLVED para nomes não encontrados.
 - `clsResolvedCommand-r2` carrega o corpo AST da função ou caminho do executável. A execução desses dois tipos continua deliberadamente fora desta fase.
 - O instalador inclui os novos módulos; `help` lista os comandos alias/unalias.
-- O runner `VBAshTests-r13` acrescenta `AliasBuiltins` e `FunctionRegistry`, além de ampliar `CommandResolver` para precedência, PATH e COMPOUND.
+- O runner `VBAshTests-r14` acrescenta `AliasBuiltins` e `FunctionRegistry`, além de ampliar `CommandResolver` para precedência, PATH e COMPOUND.
 - Estado: implementação publicada; compilação e execução no Excel/VBA ainda pendentes. A Fase 4 só poderá ser fechada após o runner r13 passar.
