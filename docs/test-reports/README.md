@@ -10,6 +10,7 @@ Use `phase-<slug>` para o diretório de cada fase, com o slug baseado no nome ad
 |---|---|---|---|
 | Pipelines | `phase-pipelines/test-reference.md` | `phase-pipelines/execution-log.md` | Aguardando registro formal |
 | Streams | `phase-streams/test-reference.md` | `phase-streams/execution-log.md` | Execução informada (17/17 PASS); fase ainda incompleta devido às lacunas abertas |
+| Command Registry (Fase 4) | `VBAshTests.bas` (runner `VBAshTests-r14`) | `phase-4-command-registry-r14.md` | 29/29 PASS; SHA exato do checkout não identificado |
 
 Uma fase só deve ser declarada aprovada quando houver evidência de execução e rastreabilidade suficientes. Um relato fornecido por uma pessoa deve ser identificado como tal, sem apresentá-lo como execução verificada independentemente.
 
