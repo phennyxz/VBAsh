@@ -511,3 +511,13 @@ Essa ordem reduz risco de refatoração e mantém cada módulo com dependências
 - Em um ambiente Excel/VBA, a compatibilidade da sessão, dos streams, dos jobs e da emulação POSIX será o que realmente permitirá scripts Bash simples e previsíveis.
 
 Este plano foi desenhado para evoluir de forma incremental, sem overengineering prematuro e com foco em um shell funcional, verificável e extensível.
+### Validação Excel — Fase 4C (2026-11-09)
+
+- Runner: `VBAshTests-r10`.
+- Resultado: 26/26 suítes PASS; 892 asserções; 0 FAIL; 0 ERROR.
+- Módulos carregados identificados: `clsSession-r4`, `clsResolvedCommand-r1`, `clsBuiltinRegistry-r1`, `clsCommandResolver-r1`; tags e propriedades concordam onde reportado.
+- `CommandResolver`: 13 asserções PASS.
+- Regressão: AST, execução, redirecionamentos, streams e demais suítes anteriores também PASS.
+- Integridade: checkout/commit UNKNOWN e correspondência checkout/módulos UNVERIFIED. A validação comprova as revisões identificadas no projeto VBA carregado, mas não vincula o workbook a um commit Git específico.
+- Conclusão: Fase 4C funcionalmente validada no Excel, com a ressalva de identidade do checkout.
+
