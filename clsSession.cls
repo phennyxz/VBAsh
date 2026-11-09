@@ -221,7 +221,7 @@ Private Function ExecuteParsedCommand(ByVal command As clsCommand) As String
     Dim restoreErrorDescription As String
 
     separator = InStr(1, command.Name, "=", vbBinaryCompare)
-    If separator > 1 And command.Args.Count = 0 Then
+    If separator > 1 And command.Args.Count = 0 And command.Redirections.Count = 0 Then
         SetEnv Left$(command.Name, separator - 1), Mid$(command.Name, separator + 1)
         LastExitCode = 0
         Exit Function
@@ -242,6 +242,12 @@ Private Function ExecuteParsedCommand(ByVal command As clsCommand) As String
         End If
     End If
 
+    If separator > 1 And command.Args.Count = 0 Then
+        SetEnv Left$(command.Name, separator - 1), Mid$(command.Name, separator + 1)
+        LastExitCode = 0
+        GoTo BuiltinComplete
+    End If
+
     Set builtin = mBuiltinRegistry.Resolve(command.Name)
     If builtin Is Nothing Then
         ErrorOutput = "Command not found: " & command.Name
@@ -253,6 +259,7 @@ Private Function ExecuteParsedCommand(ByVal command As clsCommand) As String
         outputText = builtin.Execute(Me, command.Args)
     End If
 
+BuiltinComplete:
     If Not mDescriptorTable Is Nothing Then
         Set outputStream = mDescriptorTable.GetDescriptor(1)
         Set errorStream = mDescriptorTable.GetDescriptor(2)
