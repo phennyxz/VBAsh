@@ -65,6 +65,12 @@ Public Sub ApplyRedirections(ByVal table As clsFileDescriptorTable, _
             Case "REDIR_ERR_TO_OUT"
                 table.DuplicateDescriptor 1, 2
 
+            Case "REDIR_FD_DUP"
+                ApplyDescriptorDuplication table, redirection.Target
+
+            Case "REDIR_FD_CLOSE"
+                ApplyDescriptorClose table, redirection.Target
+
             Case "REDIR_DISCARD"
                 table.CloseDescriptor 1
 
@@ -76,6 +82,34 @@ Public Sub ApplyRedirections(ByVal table As clsFileDescriptorTable, _
                           "Operador de redirecionamento não suportado: " & redirection.Operator
         End Select
     Next redirection
+End Sub
+
+Private Sub ApplyDescriptorDuplication(ByVal table As clsFileDescriptorTable, _
+                                          ByVal operatorText As String)
+    Dim separator As Long
+    Dim destination As Long
+    Dim source As Long
+    separator = InStr(1, operatorText, ">&", vbBinaryCompare)
+    If separator <= 1 Or separator + 2 >= Len(operatorText) Then
+        Err.Raise REDIRECTION_ERROR, "clsRedirectionManager", _
+                  "Operador de duplicação de descritor inválido: " & operatorText
+    End If
+    destination = CLng(Left$(operatorText, separator - 1))
+    source = CLng(Mid$(operatorText, separator + 2))
+    table.DuplicateDescriptor source, destination
+End Sub
+
+Private Sub ApplyDescriptorClose(ByVal table As clsFileDescriptorTable, _
+                                 ByVal operatorText As String)
+    Dim separator As Long
+    Dim descriptor As Long
+    separator = InStr(1, operatorText, ">&-", vbBinaryCompare)
+    If separator <= 1 Then
+        Err.Raise REDIRECTION_ERROR, "clsRedirectionManager", _
+                  "Operador de fechamento de descritor inválido: " & operatorText
+    End If
+    descriptor = CLng(Left$(operatorText, separator - 1))
+    table.CloseDescriptor descriptor
 End Sub
 
 Private Function ResolvePath(ByVal currentDirectory As String, ByVal path As String) As String
