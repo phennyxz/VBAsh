@@ -17,7 +17,7 @@ Private Const RUNNER_REVISION As String = "VBAshTests-r7"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
-Private Const EXPECTED_TEST_COUNT As Long = 21
+Private Const EXPECTED_TEST_COUNT As Long = 23
 
 Public Sub VBAsh_RunTests()
     Dim startedAt As Date
@@ -58,6 +58,8 @@ Public Sub VBAsh_RunTests()
     RunTest "FileDescriptorTableCloseAll"
     RunTest "DescriptorScopes"
     RunTest "DescriptorRedirection"
+    RunTest "ConsoleStream"
+    RunTest "PipeStream"
 
     finishedAt = Now
     summary = TestRunSummary()
@@ -117,6 +119,8 @@ Private Sub RunTest(ByVal testName As String)
         Case "FileDescriptorTableCloseAll": TestFileDescriptorTableCloseAll
         Case "DescriptorScopes": TestDescriptorScopes
         Case "DescriptorRedirection": TestDescriptorRedirection
+        Case "ConsoleStream": TestConsoleStream
+        Case "PipeStream": TestPipeStream
         Case Else
             Err.Raise vbObjectError + 1102, "VBAshTests.RunTest", _
                       "Teste não registrado: " & testName
@@ -346,7 +350,7 @@ Private Function LoadedModuleReport(ByRef warnings As String, ByRef unverifiedCo
 
     names = Array("VBAshTests", "IStream", "clsFileStream", "clsMemoryStream", _
                   "clsNullStream", "clsFileDescriptorTable", "clsDescriptorScope", _
-                  "clsDescriptorScopeEntry", "clsRedirectionManager")
+                  "clsDescriptorScopeEntry", "clsRedirectionManager", "clsConsoleStream", "clsPipeStream")
     For index = LBound(names) To UBound(names)
         tag = ReadModuleTag(CStr(names(index)))
         prop = ReadModuleProperty(CStr(names(index)))
@@ -1457,6 +1461,41 @@ Private Sub TestStreamContract()
     AssertTrue stream.HasError, "operation on a closed stream records error state"
     AssertEqual VBAsh_STREAM_ERROR_CLOSED, stream.LastErrorNumber, _
                 "closed-stream error has its distinct code"
+End Sub
+
+Private Sub TestConsoleStream()
+    Dim consoleStream As clsConsoleStream
+    Dim stream As IStream
+
+    Set consoleStream = New clsConsoleStream
+    consoleStream.Initialize False, True
+    Set stream = consoleStream
+    AssertTrue Not stream.CanRead And stream.CanWrite, "console output adapter is write-only"
+    AssertEqual 5, stream.WriteText("hello"), "console adapter accepts text characters"
+    AssertEqual "hello", consoleStream.Contents, "console adapter captures host output"
+    consoleStream.Reset
+    AssertEqual "", consoleStream.Contents, "console adapter reset clears prior command output"
+    AssertTrue Not stream.IsClosed, "reset leaves console adapter open"
+    stream.CloseStream
+    AssertTrue stream.IsClosed, "console adapter close is observable through IStream"
+End Sub
+
+Private Sub TestPipeStream()
+    Dim pipe As clsPipeStream
+    Dim stream As IStream
+
+    Set pipe = New clsPipeStream
+    Set stream = pipe
+    AssertTrue stream.CanRead And stream.CanWrite, "pipe starts with both endpoints open"
+    AssertTrue Not stream.AtEndOfStream, "open pipe writer prevents EOF before data"
+    AssertEqual 5, stream.WriteText("hello"), "pipe accepts text from writer"
+    AssertEqual "he", stream.ReadText(2), "pipe reader consumes buffered text"
+    AssertEqual 3, pipe.BufferedLength, "pipe reports unread buffered character count"
+    pipe.CloseWriter
+    AssertEqual "llo", stream.ReadText(10), "pipe drains remaining buffered text after writer closes"
+    AssertTrue stream.AtEndOfStream, "pipe reports EOF after buffer drains and writer closes"
+    pipe.CloseReader
+    AssertTrue stream.IsClosed, "pipe is closed when both endpoints are closed"
 End Sub
 
 Private Sub TestDescriptorScopes()
