@@ -1,6 +1,10 @@
 ' @VBAshRevision clsParser-r2
 Option Explicit
 
+Public Property Get ModuleRevision() As String
+    ModuleRevision = "clsParser-r2"
+End Property
+
 Private mTokens As Collection
 Private mOriginalText As String
 Private mIndex As Long
