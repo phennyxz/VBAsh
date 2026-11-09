@@ -3117,6 +3117,7 @@ Private Sub TestFunctionRegistry()
     Dim body As clsCommand
     Dim storedBody As clsCommand
     Dim errorNumber As Long
+    Dim session As clsSession
 
     Set registry = New clsFunctionRegistry
     Set body = New clsCommand
@@ -3149,7 +3150,6 @@ Private Sub TestFunctionRegistry()
     AssertTrue Not registry.HasFunction("greet"), "removed function is absent"
     AssertTrue Not registry.RemoveFunction("greet"), "removing absent function returns False"
 
-    Dim session As clsSession
     Set session = New clsSession
     session.RegisterFunction "greet", body
     AssertTrue session.HasFunction("greet"), "session exposes function registration"
