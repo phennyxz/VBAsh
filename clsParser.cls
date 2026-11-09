@@ -164,7 +164,8 @@ Private Function ParseSimpleCommand() As clsCommand
                 Set redirection = New clsRedirection
                 redirection.Operator = token.TokenType
                 expectsTarget = True
-            Case "REDIR_DISCARD", "REDIR_ERR_DISCARD", "REDIR_ERR_TO_OUT"
+            Case "REDIR_DISCARD", "REDIR_ERR_DISCARD", "REDIR_ERR_TO_OUT", _
+                 "REDIR_FD_DUP", "REDIR_FD_CLOSE"
                 If expectsTarget Then
                     Err.Raise vbObjectError + 1005, "clsParser.ParseAst", _
                         "Destino de redirecionamento ausente."
@@ -173,6 +174,8 @@ Private Function ParseSimpleCommand() As clsCommand
                 redirection.Operator = token.TokenType
                 If token.TokenType = "REDIR_DISCARD" Or token.TokenType = "REDIR_ERR_DISCARD" Then
                     redirection.Target = "-"
+                ElseIf token.TokenType = "REDIR_FD_DUP" Or token.TokenType = "REDIR_FD_CLOSE" Then
+                    redirection.Target = token.Value
                 Else
                     redirection.Target = "1"
                 End If
