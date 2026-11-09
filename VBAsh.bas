@@ -18,18 +18,18 @@ Public Sub VBAsh_Start()
     Dim terminal As Object
     Dim failure As String
     Dim standardInput As clsNullStream
-    Dim standardOutput As clsMemoryStream
-    Dim standardError As clsMemoryStream
+    Dim standardOutput As clsConsoleStream
+    Dim standardError As clsConsoleStream
 
     Set gSession = New clsSession
     Set gConsole = New clsConsole
     Set gFDTable = New clsFileDescriptorTable
     Set standardInput = New clsNullStream
     standardInput.Initialize True, False
-    Set standardOutput = New clsMemoryStream
-    standardOutput.Initialize "", True, True
-    Set standardError = New clsMemoryStream
-    standardError.Initialize "", True, True
+    Set standardOutput = New clsConsoleStream
+    standardOutput.Initialize False, True
+    Set standardError = New clsConsoleStream
+    standardError.Initialize False, True
     gFDTable.Initialize standardInput, standardOutput, standardError, True
     gSession.ConfigureDescriptorTable gFDTable, standardOutput, standardError
 
