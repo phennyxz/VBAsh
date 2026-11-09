@@ -209,7 +209,7 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 - A recursão é protegida por uma pilha de aliases ativos e limite de profundidade. Auto-referências e ciclos terminam emitindo literalmente o alias já ativo, evitando expansão infinita.
 - A sessão expõe RegisterAlias, HasAlias, GetAlias, RemoveAlias, GetAliasNames e ClearAliases. Os builtins `alias` e `unalias` são registrados por padrão: `alias NOME=VALOR` cria/substitui, `alias NOME` consulta, `alias` lista, `unalias NOME` remove e `unalias -a` limpa a tabela. Aliases com valor terminado em espaço, funções, comandos externos e execução de pipelines continuam fora desta entrega.
 - A expansão lexical de NOME=valor permite reconhecer o próximo nome de comando para alias, mas a semântica de atribuições prefixadas ainda não foi implementada no parser/executor.
-- A suíte AliasExpansion foi adicionada ao runner VBAshTests-r11 e cobre registry, expansão em posições de comando, argumentos, operadores, redirecionamentos, aspas, atribuições prefixadas, aliases vazios, auto-referência/ciclos e integração com a sessão. A suíte AliasBuiltins foi adicionada ao runner VBAshTests-r12 e cobre cadastro, consulta, listagem, substituição, expansão executada pelo terminal, remoção e limpeza. A validação no Excel/VBA depende da importação e execução do runner r12.
+- A suíte AliasExpansion foi adicionada ao runner VBAshTests-r11 e cobre registry, expansão em posições de comando, argumentos, operadores, redirecionamentos, aspas, atribuições prefixadas, aliases vazios, auto-referência/ciclos e integração com a sessão. A suíte AliasBuiltins, adicionada posteriormente no runner r12, cobre cadastro, consulta, listagem, substituição, expansão executada pelo terminal, remoção e limpeza. A validação no Excel/VBA depende da importação e execução do runner r12.
 
 ### Critérios de conclusão
 - O shell consegue classificar builtins e manter um resultado de resolução separado da AST.
@@ -221,12 +221,11 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 - A resolução é separada da execução.
 
 ### Testes mínimos
-- Teste 1: comando externo simples (`dir`, `echo`, `cmd /c echo`) é reconhecido como externo.
-- Teste 2: builtin registrado é reconhecido corretamente.
-- Teste 3: função registrada é resolvida antes de executável.
-- Teste 4: alias registrado é expandido antes da AST e o nome resultante segue para a resolução pós-AST.
-- Teste 5: `alias NOME=VALOR`, `alias NOME`, `alias`, `unalias NOME` e `unalias -a` operam sobre o registry da sessão.
-- Teste 6: comando vazio retorna erro sem quebrar shell.
+- Teste 1: builtin registrado é reconhecido corretamente.
+- Teste 2: alias registrado é expandido antes da AST e o nome resultante segue para a resolução pós-AST.
+- Teste 3: `alias NOME=VALOR`, `alias NOME`, `alias`, `unalias NOME` e `unalias -a` operam sobre o registry da sessão.
+- Teste 4: comando vazio retorna erro sem quebrar shell.
+- Testes de precedência de funções e descoberta de executáveis externos ficam vinculados às implementações dos registries/resolvedores correspondentes; a execução externa permanece dependente da Fase 8.
 
 ---
 
