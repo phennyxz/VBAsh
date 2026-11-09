@@ -1,4 +1,4 @@
-' @VBAshRevision clsSession-r7
+' @VBAshRevision clsSession-r8
 Option Explicit
 
 Public CurrentDirectory As String
@@ -23,7 +23,7 @@ Private mStandardError As clsConsoleStream
 Private mPendingDescriptorScope As clsDescriptorScope
 
 Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsSession-r7"
+    ModuleRevision = "clsSession-r8"
 End Property
 
 
@@ -102,6 +102,19 @@ End Function
 
 Public Function RemoveFunction(ByVal functionName As String) As Boolean
     RemoveFunction = mBuiltinRegistry.RemoveFunction(functionName)
+End Function
+
+Public Sub RegisterBuiltin(ByVal commandName As String, ByVal builtin As IBuiltin, _
+                           Optional ByVal replaceExisting As Boolean = False)
+    mBuiltinRegistry.RegisterBuiltin commandName, builtin, replaceExisting
+End Sub
+
+Public Function HasBuiltin(ByVal commandName As String) As Boolean
+    HasBuiltin = mBuiltinRegistry.HasBuiltin(commandName)
+End Function
+
+Public Function RemoveBuiltin(ByVal commandName As String) As Boolean
+    RemoveBuiltin = mBuiltinRegistry.UnregisterBuiltin(commandName)
 End Function
 
 Private Function ExpandAliasTokens(ByVal tokens As Collection) As Collection
