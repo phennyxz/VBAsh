@@ -42,7 +42,7 @@ O runner `VBAshTests-r7` registra 23 suítes. As novas suítes abaixo foram adic
 | ID | Suíte | Procedimento | Cobertura adicionada | Estado |
 |---|---|---|---|---|
 | STR-SCOPE-01 | DescriptorScopes | TestDescriptorScopes | Snapshot de bindings, pin por identidade, restauração LIFO, remoção de FDs criados no escopo e bloqueio de CloseAll enquanto há escopos ativos | NOT RUN |
-| STR-REDIR-01 | DescriptorRedirection | TestDescriptorRedirection | Integração real de sessão/tabela para `<`, `>`, `2>`, `2>&1`, `1>&2`, `n>&m` e `n>&-`; valida arquivo, FD 0, canais visíveis, ordem e restauração | NOT RUN |
+| STR-REDIR-01 | DescriptorRedirection | TestDescriptorRedirection | Integração real de sessão/tabela para `<`, `>`, `>>`, `2>`, `2>>`, `2>&1`, `1>&2`, `n>&m` e `n>&-`; valida arquivo, FD 0, canais visíveis, ordem e restauração | NOT RUN |
 | STR-CONSOLE-01 | ConsoleStream | TestConsoleStream | Adaptador de captura textual usado nos FDs padrão do host, reset e fechamento | NOT RUN |
 | STR-PIPE-01 | PipeStream | TestPipeStream | Buffer textual, consumo parcial, fechamento do writer, drenagem e EOF | NOT RUN |
 
