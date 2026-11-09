@@ -1,8 +1,9 @@
 # VBAsh — Inventário de branches
 
-**Data da consulta:** 2026-11-09  
+**Data da consulta:** 2026-11-09 (após a primeira rodada de organização documental)  
 **Repositório:** phennyxz/VBAsh  
-**main na consulta:** 0d4115f4ced6f3772fa38182a71a34fdfee387ce
+**main na consulta:** 0d4115f4ced6f3772fa38182a71a34fdfee387ce  
+**Branch ativa após os commits documentais:** 155 commits à frente de main, 0 atrás
 
 Esta é uma fotografia remota. Status de branch pode mudar; repetir a comparação antes de qualquer exclusão ou merge. “Atrás” e “à frente” são contagens da comparação com main, não uma avaliação de qualidade.
 
@@ -10,9 +11,9 @@ Esta é uma fotografia remota. Status de branch pode mudar; repetir a comparaç�
 
 | Branch | Comparação com main | Leitura |
 |---|---:|---|
-| feature/phase-3-integration | 147 à frente, 0 atrás | Branch ativa de referência. Contém o estado mais recente usado para o r14 e o trabalho das Fases 3/4. Preservar. |
+| feature/phase-3-integration | 155 à frente, 0 atrás | Branch ativa de referência. Contém o estado mais recente usado para o r14 e o trabalho das Fases 3/4. Preservar. |
 
-A comparação apontou 28 arquivos alterados em relação ao ponto de divergência, incluindo tokenizer, parser, sessão, registry, aliases, streams e documentação. O SHA do HEAD desta branch não foi exposto pelo resultado da comparação; consultar localmente com git rev-parse HEAD antes de criar uma branch de trabalho ou registrar execução.
+A comparação após a organização documental aponta 155 commits à frente de main e 0 atrás. O conjunto de arquivos divergentes inclui tokenizer, parser, sessão, registry, aliases, streams e a documentação de governança recém-adicionada. O SHA do HEAD desta branch não foi exposto pelo resultado da comparação; consultar localmente com git rev-parse HEAD antes de criar uma branch de trabalho ou registrar execução.
 
 ## Branches cujo conteúdo está contido em main
 
