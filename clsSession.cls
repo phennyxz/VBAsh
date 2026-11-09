@@ -266,35 +266,51 @@ Private Function ExecuteParsedCommand(ByVal command As clsCommand) As String
 
 BuiltinComplete:
     If Not mDescriptorTable Is Nothing Then
-        Set outputStream = mDescriptorTable.GetDescriptor(1)
-        Set errorStream = mDescriptorTable.GetDescriptor(2)
         outputHadText = HasOutput Or Len(outputText) > 0
         errorHadText = HasErrorOutput And Len(ErrorOutput) > 0
-        If outputHadText Then
+        errorText = ErrorOutput
+
+        If mDescriptorTable.HasDescriptor(1) Then
+            Set outputStream = mDescriptorTable.GetDescriptor(1)
+        ElseIf outputHadText Then
+            If errorHadText Then errorText = errorText & vbCrLf
+            errorText = errorText & "VBAsh: bad file descriptor: 1"
+            errorHadText = True
+            outputHadText = False
+            LastExitCode = 1
+        End If
+
+        If mDescriptorTable.HasDescriptor(2) Then
+            Set errorStream = mDescriptorTable.GetDescriptor(2)
+        ElseIf errorHadText Then
+            errorHadText = False
+            LastExitCode = 1
+        End If
+
+        If Not outputStream Is Nothing And outputHadText Then
             outputStream.WriteText outputText & IIf(SuppressNewline, "", vbCrLf)
         End If
-        If errorHadText Then
-            errorText = ErrorOutput
+        If Not errorStream Is Nothing And errorHadText Then
             errorStream.WriteText errorText & vbCrLf
         End If
 
         ' Reconstruct only the host-visible channels. If both descriptors
         ' reference the same capture stream, preserve the actual write order.
-        If outputStream Is mStandardOutput Then
+        If Not outputStream Is Nothing And outputStream Is mStandardOutput Then
             visibleOutput = outputText
             visibleHasOutput = outputHadText
-        ElseIf outputStream Is mStandardError Then
+        ElseIf Not outputStream Is Nothing And outputStream Is mStandardError Then
             visibleError = outputText
             visibleHasError = outputHadText
         End If
 
-        If errorStream Is mStandardOutput Then
+        If Not errorStream Is Nothing And errorStream Is mStandardOutput Then
             If errorHadText Then
                 If visibleHasOutput And Not SuppressNewline Then visibleOutput = visibleOutput & vbCrLf
                 visibleOutput = visibleOutput & errorText
                 visibleHasOutput = True
             End If
-        ElseIf errorStream Is mStandardError Then
+        ElseIf Not errorStream Is Nothing And errorStream Is mStandardError Then
             If errorHadText Then
                 If visibleHasError And Not SuppressNewline Then visibleError = visibleError & vbCrLf
                 visibleError = visibleError & errorText
