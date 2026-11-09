@@ -230,7 +230,16 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 
 ---
 
-### Validação Excel — Fase 4D (2026-11-09)\n\n- Runner: `VBAshTests-r11`.\n- Resultado: 27/27 suítes PASS; 933 asserções; 0 FAIL; 0 ERROR.\n- `AliasExpansion`: 41 asserções PASS.\n- Módulos de sessão/parser identificados como `clsSession-r5` e `clsParser-r3`; registry/expansor novos não foram listados no relatório.\n- Checkout/commit UNKNOWN e correspondência checkout/módulos UNVERIFIED.\n- Conclusão: expansão lexical e integração de aliases funcionalmente validadas; interface de terminal `alias`/`unalias` ainda não estava implementada nesta validação.\n\n## Fase 5 — Lexer
+### Validação Excel — Fase 4D (2026-11-09)
+
+- Runner: `VBAshTests-r11`.
+- Resultado: 27/27 suítes PASS; 933 asserções; 0 FAIL; 0 ERROR.
+- `AliasExpansion`: 41 asserções PASS.
+- Módulos de sessão/parser identificados como `clsSession-r5` e `clsParser-r3`; registry/expansor novos não foram listados no relatório.
+- Checkout/commit UNKNOWN e correspondência checkout/módulos UNVERIFIED.
+- Conclusão: expansão lexical e integração de aliases funcionalmente validadas; interface de terminal `alias`/`unalias` ainda não estava implementada nesta validação.
+
+## Fase 5 — Lexer
 
 ### Objetivo
 Implementar a análise léxica do shell, convertendo texto em tokens compreensíveis para o parser.
@@ -532,4 +541,22 @@ Este plano foi desenhado para evoluir de forma incremental, sem overengineering 
 - Integridade: checkout/commit UNKNOWN e correspondência checkout/módulos UNVERIFIED. A validação comprova as revisões identificadas no projeto VBA carregado, mas não vincula o workbook a um commit Git específico.
 - Conclusão: Fase 4C funcionalmente validada no Excel, com a ressalva de identidade do checkout.
 
-\n\n### Implementação de interface de aliases — Fase 4E (em validação)\n\n- `clsBuiltinAlias` e `clsBuiltinUnalias` conectam a sintaxe de terminal ao registry da sessão.\n- `alias NOME=VALOR` cria ou substitui; `alias NOME` consulta; `alias` lista. `unalias NOME` remove e `unalias -a` limpa todos.\n- O registry e a sessão expõem enumeração e limpeza; o instalador inclui os dois novos módulos na lista de limpeza legada.\n- O runner `VBAshTests-r12` acrescenta `AliasBuiltins`, incluindo fluxo real por `ProcessInput`.\n- A implementação ainda precisa ser importada/compilada e executada no Excel/VBA; só então a Fase 4 poderá ser fechada funcionalmente.\n
+
+
+### Implementação de interface de aliases — Fase 4E (em validação)
+
+- `clsBuiltinAlias` e `clsBuiltinUnalias` conectam a sintaxe de terminal ao registry da sessão.
+- `alias NOME=VALOR` cria ou substitui; `alias NOME` consulta; `alias` lista. `unalias NOME` remove e `unalias -a` limpa todos.
+- O registry e a sessão expõem enumeração e limpeza; o instalador inclui os dois novos módulos na lista de limpeza legada.
+- O runner `VBAshTests-r12` acrescenta `AliasBuiltins`, incluindo fluxo real por `ProcessInput`.
+- A implementação ainda precisa ser importada/compilada e executada no Excel/VBA; só então a Fase 4 poderá ser fechada funcionalmente.
+
+
+### Implementação da interface de aliases — Fase 4E (2026-11-09)
+
+- `clsBuiltinAlias` e `clsBuiltinUnalias` foram adicionados e registrados em `clsBuiltinRegistry-r2`.
+- `alias NOME=VALOR` cria/substitui; `alias NOME` consulta; `alias` lista; `unalias NOME` remove; `unalias -a` limpa todos.
+- `clsAliasRegistry-r2` e `clsSession-r6` expõem listagem e limpeza de aliases.
+- O instalador inclui os dois novos módulos; `help` lista os comandos.
+- O runner `VBAshTests-r12` inclui a suíte `AliasBuiltins`, com execução por `ProcessInput`.
+- Estado: implementação publicada; compilação e execução no Excel/VBA ainda pendentes. A Fase 4 não deve ser marcada como validada até o runner r12 passar.
