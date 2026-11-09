@@ -418,6 +418,22 @@ Private Function ReadModuleProperty(ByVal moduleName As String) As String
             Dim descriptorTable As clsFileDescriptorTable
             Set descriptorTable = New clsFileDescriptorTable
             ReadModuleProperty = descriptorTable.ModuleRevision
+        Case "clsDescriptorScope"
+            Dim descriptorScope As clsDescriptorScope
+            Set descriptorScope = New clsDescriptorScope
+            ReadModuleProperty = descriptorScope.ModuleRevision
+        Case "clsRedirectionManager"
+            Dim redirectionManager As clsRedirectionManager
+            Set redirectionManager = New clsRedirectionManager
+            ReadModuleProperty = redirectionManager.ModuleRevision
+        Case "clsConsoleStream"
+            Dim consoleStream As clsConsoleStream
+            Set consoleStream = New clsConsoleStream
+            ReadModuleProperty = consoleStream.ModuleRevision
+        Case "clsPipeStream"
+            Dim pipeStream As clsPipeStream
+            Set pipeStream = New clsPipeStream
+            ReadModuleProperty = pipeStream.ModuleRevision
     End Select
 Done:
 End Function
