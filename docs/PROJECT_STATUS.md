@@ -9,7 +9,7 @@ Este documento é uma fotografia de estado, não uma promessa de compatibilidade
 
 ## Resumo executivo
 
-- O desenvolvimento ativo está em feature/phase-3-integration. Na comparação com main, estava 147 commits à frente e 0 atrás. A API de comparação não expôs o SHA do HEAD dessa branch nesta consulta; não inventar ou inferir esse SHA.
+- O desenvolvimento ativo está em feature/phase-3-integration. Na comparação com main, está 155 commits à frente e 0 atrás. A API de comparação não expôs o SHA do HEAD dessa branch nesta consulta; não inventar ou inferir esse SHA.
 - O runner VBAshTests-r14 reportou 29/29 suítes PASS, 969 asserções, 0 FAIL e 0 ERROR em execução real no Excel/VBA informada pelo usuário.
 - O relatório r14 identificou as revisões dos módulos carregados, mas checkout/branch/SHA do workbook estavam UNKNOWN e a correspondência checkout/módulos UNVERIFIED.
 - A Fase 4 (Command Registry) pode ser considerada funcionalmente validada no ambiente testado, com a ressalva de rastreabilidade.
