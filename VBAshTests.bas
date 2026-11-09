@@ -1587,6 +1587,7 @@ Private Sub TestDescriptorScopes()
     AssertTrue stream.CanRead, "restored original stream remains usable"
     AssertTrue DescriptorStreamIsClosed(temporaryStream), "owned temporary stream closes after restoration"
     AssertTrue Not table.HasDescriptor(4), "descriptor created inside scope is removed"
+    table.CloseAll
 End Sub
 
 Private Sub TestDescriptorRedirection()
