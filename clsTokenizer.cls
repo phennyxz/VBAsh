@@ -1,6 +1,10 @@
 ' @VBAshRevision clsTokenizer-r2
 Option Explicit
 
+Public Property Get ModuleRevision() As String
+    ModuleRevision = "clsTokenizer-r2"
+End Property
+
 Private mSource As String
 Private mIndex As Long
 Private mLen As Long
