@@ -171,6 +171,15 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 - Fase 2: sessão funcional
 - Fase 3: streams e redireções funcionando
 
+### Implementação incremental — contrato inicial (Fase 4A)
+
+- `clsResolvedCommand` é o resultado da resolução e permanece separado de `clsCommand`, que representa nós da AST.
+- O contrato contém `Name`, `CommandType`, `Args`, `Redirections`, `Context`, `SourceNode` e a referência `Builtin` quando aplicável.
+- Tipos aceitos: `ALIAS`, `FUNCTION`, `BUILTIN`, `EXTERNAL` e `COMPOUND`.
+- `Init` rejeita nome vazio e tipo desconhecido; argumentos e redirecionamentos são coleções independentes por instância.
+- Esta entrega define apenas o contrato. Não resolve aliases/funções/executáveis, não altera a sessão e não executa comandos.
+- Testes isolados adicionados ao runner `VBAshTests-r8`; a compilação e execução no Excel ainda dependem da validação do usuário.
+
 ### Critérios de conclusão
 - O shell consegue classificar um comando em uma de várias categorias.
 - O registry resolve a prioridade correta:
