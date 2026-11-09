@@ -1510,7 +1510,7 @@ Private Sub TestDescriptorScopes()
     table.RestoreDescriptorScope scope
     Set stream = table.GetDescriptor(3)
     AssertTrue stream Is originalStream, "scope restores original descriptor identity"
-    AssertTrue originalStream.CanRead, "restored original stream remains usable"
+    AssertTrue stream.CanRead, "restored original stream remains usable"
     AssertTrue DescriptorStreamIsClosed(temporaryStream), "owned temporary stream closes after restoration"
     AssertTrue Not table.HasDescriptor(4), "descriptor created inside scope is removed"
 End Sub
