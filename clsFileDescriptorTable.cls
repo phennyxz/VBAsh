@@ -13,6 +13,7 @@ Private mDescriptors As Object
 Private mOwnedStreams As Collection
 Private mIsInitialized As Boolean
 Private mClosingAll As Boolean
+Private mScopes As Collection
 
 ' Identifies the table API and ownership implementation revision.
 Public Property Get ModuleRevision() As String
@@ -22,6 +23,7 @@ End Property
 Private Sub Class_Initialize()
     Set mDescriptors = CreateObject("Scripting.Dictionary")
     Set mOwnedStreams = New Collection
+    Set mScopes = New Collection
 End Sub
 
 ' Standard streams are borrowed unless ownership is explicitly transferred.
@@ -146,6 +148,7 @@ Public Sub CloseAll()
 
     EnsureInitialized "CloseAll"
     EnsureNotClosingAll "CloseAll"
+    EnsureNoActiveScopes "CloseAll"
     count = mDescriptors.Count
     If count = 0 Then Exit Sub
 
@@ -224,6 +227,124 @@ CloseFailure:
     errorDescription = Err.Description
 End Sub
 
+
+' Captures the current descriptor bindings and pins their stream identities.
+Public Function BeginDescriptorScope() As clsDescriptorScope
+    Dim scope As clsDescriptorScope
+    Dim entry As clsDescriptorScopeEntry
+    Dim keys As Variant
+    Dim index As Long
+    Dim stream As IStream
+
+    EnsureInitialized "BeginDescriptorScope"
+    EnsureNotClosingAll "BeginDescriptorScope"
+    Set scope = New clsDescriptorScope
+    If mDescriptors.Count > 0 Then
+        keys = mDescriptors.Keys
+        For index = LBound(keys) To UBound(keys)
+            Set stream = mDescriptors.Item(CStr(keys(index)))
+            Set entry = New clsDescriptorScopeEntry
+            entry.Descriptor = CLng(keys(index))
+            entry.WasPresent = True
+            Set entry.SavedStream = stream
+            entry.WasOwned = IsOwnedStream(stream)
+            scope.AddEntry entry
+        Next index
+    End If
+    mScopes.Add scope
+    Set BeginDescriptorScope = scope
+End Function
+
+' Restores a scope in strict LIFO order. Failed operations leave the scope
+' active so the caller can retry without losing its saved stream references.
+Public Sub RestoreDescriptorScope(ByVal scope As clsDescriptorScope)
+    Dim entry As clsDescriptorScopeEntry
+    Dim index As Long
+    Dim keys As Variant
+    Dim key As String
+    Dim keep As Boolean
+
+    EnsureInitialized "RestoreDescriptorScope"
+    EnsureNotClosingAll "RestoreDescriptorScope"
+    If scope Is Nothing Then
+        RaiseTableError FD_ERROR_INVALID, "RestoreDescriptorScope", "Scope ausente."
+    End If
+    If mScopes.Count = 0 Then
+        RaiseTableError FD_ERROR_INVALID, "RestoreDescriptorScope", "Não há escopos ativos."
+    End If
+    If Not (mScopes.Item(mScopes.Count) Is scope) Then
+        RaiseTableError FD_ERROR_INVALID, "RestoreDescriptorScope", _
+                        "Os escopos devem ser restaurados em ordem LIFO."
+    End If
+    If scope.IsRestored Then
+        mScopes.Remove mScopes.Count
+        Exit Sub
+    End If
+
+    scope.BeginRestore
+    On Error GoTo RestoreFailure
+
+    ' Remove descriptors created inside the scope.
+    If mDescriptors.Count > 0 Then
+        keys = mDescriptors.Keys
+        For index = LBound(keys) To UBound(keys)
+            key = CStr(keys(index))
+            keep = ScopeContainsDescriptor(scope, CLng(key))
+            If Not keep Then
+                If mDescriptors.Exists(key) Then CloseDescriptor CLng(key)
+            End If
+        Next index
+    End If
+
+    ' Restore every binding that existed at scope entry.
+    For index = 1 To scope.EntryCount
+        Set entry = scope.GetEntry(index)
+        If Not entry.RestoreCompleted Then
+            If mDescriptors.Exists(CStr(entry.Descriptor)) Then
+                SetDescriptor entry.Descriptor, entry.SavedStream, False
+            Else
+                SetDescriptor entry.Descriptor, entry.SavedStream, False
+            End If
+            entry.RestoreCompleted = True
+        End If
+    Next index
+
+    scope.CompleteRestore
+    mScopes.Remove mScopes.Count
+    Exit Sub
+
+RestoreFailure:
+    Dim errorNumber As Long
+    Dim errorSource As String
+    Dim errorDescription As String
+    errorNumber = Err.Number
+    errorSource = Err.Source
+    errorDescription = Err.Description
+    scope.CancelRestoreAttempt
+    On Error GoTo 0
+    Err.Raise errorNumber, errorSource, errorDescription
+End Sub
+
+Private Function ScopeContainsDescriptor(ByVal scope As clsDescriptorScope, _
+                                         ByVal descriptor As Long) As Boolean
+    Dim index As Long
+    Dim entry As clsDescriptorScopeEntry
+    For index = 1 To scope.EntryCount
+        Set entry = scope.GetEntry(index)
+        If entry.Descriptor = descriptor Then
+            ScopeContainsDescriptor = True
+            Exit Function
+        End If
+    Next index
+End Function
+
+Private Sub EnsureNoActiveScopes(ByVal operation As String)
+    If mScopes.Count > 0 Then
+        RaiseTableError FD_ERROR_CLEANUP_IN_PROGRESS, operation, _
+                        "Não é possível limpar a tabela enquanto há escopos ativos."
+    End If
+End Sub
+
 ' Returns the lowest unused descriptor at or above 3 without reserving it.
 Public Function FindFreeDescriptor() As Long
     Dim descriptor As Long
@@ -279,6 +400,26 @@ Private Function HasOtherDescriptorReference(ByVal stream As IStream, _
             End If
         End If
     Next descriptorKey
+    If IsPinnedStream(stream) Then HasOtherDescriptorReference = True
+End Function
+
+Private Function IsPinnedStream(ByVal stream As IStream) As Boolean
+    Dim scopeIndex As Long
+    Dim entryIndex As Long
+    Dim scope As clsDescriptorScope
+    Dim entry As clsDescriptorScopeEntry
+    For scopeIndex = 1 To mScopes.Count
+        Set scope = mScopes(scopeIndex)
+        For entryIndex = 1 To scope.EntryCount
+            Set entry = scope.GetEntry(entryIndex)
+            If entry.WasPresent Then
+                If entry.SavedStream Is stream Then
+                    IsPinnedStream = True
+                    Exit Function
+                End If
+            End If
+        Next entryIndex
+    Next scopeIndex
 End Function
 
 Private Function IsOwnedStream(ByVal stream As IStream) As Boolean
