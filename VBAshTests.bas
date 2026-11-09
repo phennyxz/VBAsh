@@ -1,4 +1,4 @@
-' @VBAshRevision VBAshTests-r9
+' @VBAshRevision VBAshTests-r10
 Option Explicit
 
 Private mAssertions As Long
@@ -13,11 +13,11 @@ Private mLastAssertNumber As Long
 Private mLastAssertDescription As String
 Private mFailExpected As String
 Private mFailActual As String
-Private Const RUNNER_REVISION As String = "VBAshTests-r9"
+Private Const RUNNER_REVISION As String = "VBAshTests-r10"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
-Private Const EXPECTED_TEST_COUNT As Long = 25
+Private Const EXPECTED_TEST_COUNT As Long = 26
 
 Public Sub VBAsh_RunTests()
     Dim startedAt As Date
@@ -62,6 +62,7 @@ Public Sub VBAsh_RunTests()
     RunTest "PipeStream"
     RunTest "ResolvedCommand"
     RunTest "BuiltinRegistry"
+    RunTest "CommandResolver"
 
     finishedAt = Now
     summary = TestRunSummary()
@@ -125,6 +126,7 @@ Private Sub RunTest(ByVal testName As String)
         Case "PipeStream": TestPipeStream
         Case "ResolvedCommand": TestResolvedCommand
         Case "BuiltinRegistry": TestBuiltinRegistry
+        Case "CommandResolver": TestCommandResolver
         Case Else
             Err.Raise vbObjectError + 1102, "VBAshTests.RunTest", _
                       "Teste não registrado: " & testName
@@ -2917,6 +2919,52 @@ Private Sub TestResolvedCommand()
     AssertEqual vbObjectError + 1301, errorNumber, "unsupported command type is rejected"
 End Sub
 
+
+
+Private Sub TestCommandResolver()
+    Dim resolver As clsCommandResolver
+    Dim source As clsCommand
+    Dim resolved As clsResolvedCommand
+    Dim session As clsSession
+    Dim redirection As clsRedirection
+    Dim storedRedirection As clsRedirection
+
+    Set resolver = New clsCommandResolver
+    Set session = New clsSession
+    Set source = New clsCommand
+    source.Init "echo", "echo hello"
+    source.AddArg "hello"
+    Set redirection = New clsRedirection
+    redirection.Operator = ">"
+    redirection.Target = "resolver-test.txt"
+    source.AddRedirection redirection
+
+    Set resolved = resolver.ResolveCommand(source, session)
+    AssertEqual "BUILTIN", resolved.CommandType, "registered builtin resolves as BUILTIN"
+    AssertEqual "echo", resolved.Name, "resolver preserves command name"
+    AssertTrue resolved.Context Is session, "resolver preserves session context"
+    AssertTrue resolved.SourceNode Is source, "resolver preserves source AST identity"
+    AssertEqual 1, resolved.Args.Count, "resolver copies AST arguments"
+    AssertEqual "hello", CStr(resolved.Args(1)), "resolver preserves argument value"
+    AssertEqual 1, resolved.Redirections.Count, "resolver copies AST redirections"
+    Set storedRedirection = resolved.Redirections(1)
+    AssertTrue storedRedirection Is redirection, "resolver preserves redirection object identity"
+    AssertTrue Not (resolved.Builtin Is Nothing), "builtin resolution supplies implementation"
+
+    source.Init "not-a-registered-command", "not-a-registered-command"
+    Set resolved = resolver.ResolveCommand(source, session)
+    AssertEqual "UNRESOLVED", resolved.CommandType, "unknown command is explicitly unresolved"
+    AssertEqual 0, resolved.Args.Count, "unknown command retains empty argument list"
+    AssertTrue resolved.Builtin Is Nothing, "unknown command has no builtin implementation"
+
+    source.InitAstNode "PIPELINE", 0, 1
+    On Error Resume Next
+    Err.Clear
+    Set resolved = resolver.ResolveCommand(source, session)
+    AssertEqual True, (Err.Number <> 0), "resolver rejects non-simple AST nodes"
+    Err.Clear
+    On Error GoTo 0
+End Sub
 
 Private Sub TestBuiltinRegistry()
     Dim registry As clsBuiltinRegistry
