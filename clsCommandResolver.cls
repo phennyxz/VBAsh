@@ -1,6 +1,10 @@
 ' @VBAshRevision clsCommandResolver-r1
 Option Explicit
 
+Public Property Get ModuleRevision() As String
+    ModuleRevision = "clsCommandResolver-r1"
+End Property
+
 Private mBuiltinRegistry As clsBuiltinRegistry
 
 Private Sub Class_Initialize()
