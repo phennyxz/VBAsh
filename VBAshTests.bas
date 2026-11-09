@@ -3069,6 +3069,8 @@ Private Sub TestAliasExpansion()
     Dim tokens As Collection
     Dim expanded As Collection
     Dim session As clsSession
+    Dim parser As clsParser
+    Dim ast As clsCommand
     Dim result As String
     Dim errorNumber As Long
 
@@ -3165,7 +3167,7 @@ Private Sub TestAliasExpansion()
     Set expanded = expander.ExpandTokens(tokens, registry)
     AssertEqual "echo", CStr(expanded(1).Value), "aliases can expand through another alias"
     AssertEqual "fixed", CStr(expanded(3).Value), "nested alias expansion retains replacement arguments"
-    AssertEqual "tail", CStr(expanded(4).Value), "nested alias expansion preserves original arguments"
+    AssertEqual "tail", CStr(expanded(5).Value), "nested alias expansion preserves original arguments"
 
     registry.RegisterAlias "cycle-a", "cycle-b"
     registry.RegisterAlias "cycle-b", "cycle-a"
