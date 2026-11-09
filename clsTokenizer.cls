@@ -31,6 +31,33 @@ Public Function Tokenize(ByVal sourceText As String) As Collection
             GoTo ContinueLoop
         End If
 
+        ' Generic descriptor duplication/closure: n>&m and n>&-.
+        If ch >= "0" And ch <= "9" Then
+            Dim descriptorEnd As Long
+            Dim descriptorSource As String
+            Dim descriptorOperator As String
+            descriptorEnd = mIndex
+            Do While descriptorEnd <= mLen
+                ch = Mid$(mSource, descriptorEnd, 1)
+                If ch < "0" Or ch > "9" Then Exit Do
+                descriptorEnd = descriptorEnd + 1
+            Loop
+            If Mid$(mSource, descriptorEnd, 2) = ">&" Then
+                descriptorSource = Mid$(mSource, descriptorEnd + 2, 1)
+                If (descriptorSource >= "0" And descriptorSource <= "9") Or descriptorSource = "-" Then
+                    If descriptorSource = "-" Then
+                        descriptorOperator = "REDIR_FD_CLOSE"
+                    Else
+                        descriptorOperator = "REDIR_FD_DUP"
+                    End If
+                    AddToken resultTokens, descriptorOperator, _
+                             Mid$(mSource, mIndex, descriptorEnd + 2 - mIndex) & descriptorSource
+                    mIndex = descriptorEnd + 3
+                    GoTo ContinueLoop
+                End If
+            End If
+        End If
+
         If Mid$(mSource, mIndex, 4) = "2>&1" Then
             AddToken resultTokens, "REDIR_ERR_TO_OUT", "2>&1"
             mIndex = mIndex + 4
