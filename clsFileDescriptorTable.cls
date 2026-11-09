@@ -263,6 +263,9 @@ Public Sub RestoreDescriptorScope(ByVal scope As clsDescriptorScope)
     Dim keys As Variant
     Dim key As String
     Dim keep As Boolean
+    Dim errorNumber As Long
+    Dim errorSource As String
+    Dim errorDescription As String
 
     EnsureInitialized "RestoreDescriptorScope"
     EnsureNotClosingAll "RestoreDescriptorScope"
@@ -314,9 +317,6 @@ Public Sub RestoreDescriptorScope(ByVal scope As clsDescriptorScope)
     Exit Sub
 
 RestoreFailure:
-    Dim errorNumber As Long
-    Dim errorSource As String
-    Dim errorDescription As String
     errorNumber = Err.Number
     errorSource = Err.Source
     errorDescription = Err.Description
