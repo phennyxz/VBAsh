@@ -1,4 +1,4 @@
-' @VBAshRevision clsResolvedCommand-r1
+' @VBAshRevision clsResolvedCommand-r2
 Option Explicit
 
 ' A resolved command is execution metadata, not an AST node.
@@ -11,9 +11,11 @@ Public Redirections As Collection
 Public Context As clsSession
 Public SourceNode As clsCommand
 Public Builtin As IBuiltin
+Public FunctionBody As clsCommand
+Public ExecutablePath As String
 
 Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsResolvedCommand-r1"
+    ModuleRevision = "clsResolvedCommand-r2"
 End Property
 
 Private Sub Class_Initialize()
@@ -44,6 +46,8 @@ Public Sub Init(ByVal commandName As String, ByVal resolvedType As String, _
     Set Context = sessionContext
     Set SourceNode = Nothing
     Set Builtin = Nothing
+    Set FunctionBody = Nothing
+    ExecutablePath = ""
     Set Args = New Collection
     Set Redirections = New Collection
 End Sub
