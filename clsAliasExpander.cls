@@ -175,7 +175,8 @@ Private Function IsAssignmentWord(ByVal token As clsToken) As Boolean
     Dim i As Long
     Dim ch As String
     Dim segment As clsWordSegment
-    Dim checkedCharacters As Long
+    Dim sourcePosition As Long
+    Dim equalsIsUnquoted As Boolean
 
     separator = InStr(1, token.Value, "=", vbBinaryCompare)
     If separator <= 1 Then Exit Function
@@ -183,13 +184,20 @@ Private Function IsAssignmentWord(ByVal token As clsToken) As Boolean
 
     For Each segment In token.Segments
         For i = 1 To Len(segment.Text)
-            If checkedCharacters >= Len(namePart) Then Exit For
-            If segment.QuoteContext <> "UNQUOTED" Or segment.IsEscaped Then Exit Function
-            checkedCharacters = checkedCharacters + 1
+            sourcePosition = sourcePosition + 1
+            If sourcePosition <= Len(namePart) Then
+                If segment.QuoteContext <> "UNQUOTED" Or segment.IsEscaped Then Exit Function
+            ElseIf sourcePosition = separator Then
+                If segment.QuoteContext <> "UNQUOTED" Or segment.IsEscaped Then Exit Function
+                equalsIsUnquoted = True
+                Exit For
+            Else
+                Exit For
+            End If
         Next i
-        If checkedCharacters >= Len(namePart) Then Exit For
+        If equalsIsUnquoted Then Exit For
     Next segment
-    If checkedCharacters <> Len(namePart) Then Exit Function
+    If Not equalsIsUnquoted Then Exit Function
 
     For i = 1 To Len(namePart)
         ch = Mid$(namePart, i, 1)
