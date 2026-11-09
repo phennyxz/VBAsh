@@ -225,7 +225,18 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 - `clsResolvedCommand-r2` carrega o corpo AST da função ou caminho do executável. A execução desses dois tipos continua deliberadamente fora desta fase.
 - O instalador inclui os novos módulos; `help` lista os comandos alias/unalias.
 - O runner `VBAshTests-r14` acrescenta `AliasBuiltins` e `FunctionRegistry`, além de ampliar `CommandResolver` para precedência, PATH e COMPOUND; o relatório identifica as revisões dos módulos novos e atualizados.
-- Estado: implementação publicada; compilação e execução no Excel/VBA ainda pendentes. A Fase 4 só poderá ser fechada após o runner r13 passar.
+- Estado: implementação publicada e funcionalmente validada no Excel/VBA pelo runner `VBAshTests-r14` (29/29 suítes PASS, 969 asserções, 0 FAIL e 0 ERROR). O registro da execução está em `docs/test-reports/phase-4-command-registry-r14.md`. A identidade do checkout local e o SHA exato testado permanecem UNKNOWN; as revisões dos módulos carregados foram identificadas e conferidas contra o snapshot remoto da branch.
+
+### Validação Excel — Fase 4E (2026-11-09)
+
+- Runner: `VBAshTests-r14`.
+- Resultado: 29/29 suítes PASS; 969 asserções; 0 FAIL; 0 ERROR.
+- `AliasExpansion`: 41 asserções; `AliasBuiltins`: 14; `FunctionRegistry`: 11; `CommandResolver`: 19; `ResolvedCommand`: 20; `BuiltinRegistry`: 20 — todas PASS.
+- Revisões carregadas identificadas, incluindo `clsSession-r8`, `clsBuiltinRegistry-r2`, `clsCommandResolver-r3`, `clsResolvedCommand-r2`, `clsAliasRegistry-r2`, `clsAliasExpander-r1`, `clsBuiltinAlias-r1`, `clsBuiltinUnalias-r1`, `clsFunctionRegistry-r1` e `clsExternalCommandResolver-r1`.
+- As tags desses módulos foram conferidas no snapshot remoto da branch `feature/phase-3-integration`.
+- Checkout local e SHA exato testado: UNKNOWN; correspondência checkout/módulos: UNVERIFIED. O commit remoto `8777e1a3c368db615acd76cdc4f78e09203d4976` é registrado apenas como referência do snapshot consultado, não como SHA certificado do workbook.
+- Conclusão: Fase 4 funcionalmente validada no Excel testado. Execução de funções e processos externos continua fora do escopo.
+- Relatório completo: `docs/test-reports/phase-4-command-registry-r14.md`.
 
 ### Critérios de conclusão
 - O shell consegue classificar builtins e manter um resultado de resolução separado da AST.
