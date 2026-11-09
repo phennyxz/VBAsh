@@ -6,7 +6,7 @@ Private mOriginalText As String
 Private mIndex As Long
 
 Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsParser-r2"
+    ModuleRevision = "clsParser-r3"
 End Property
 
 
