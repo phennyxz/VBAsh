@@ -1,6 +1,6 @@
 # VBAsh — Fluxo de desenvolvimento
 
-Este fluxo existe para evitar divergência entre o que o Copilot altera, o que está no GitHub, o que foi importado no Excel e o que os relatórios dizem que passou.
+O VBAsh segue uma única linha evolutiva. A branch canônica atual é feature/phase-3-integration; main é uma referência histórica atrasada e não deve ser usada como base ou destino de integração.
 
 ## 1. Antes de cada tarefa
 
@@ -11,27 +11,30 @@ git fetch --all --prune
 git status --short --branch
 git branch -vv
 git rev-parse HEAD
+git rev-parse origin/feature/phase-3-integration
 git log -1 --oneline --decorate
 ```
 
-- Confirmar a branch-base e o SHA exato.
-- Se houver alterações locais, identificá-las antes de trocar de branch.
-- Não usar uma branch Copilot antiga como base sem comparar seu histórico.
-- Ler o estado do projeto e a fase correspondente em docs/PROJECT_STATUS.md, docs/BRANCH_STATUS.md e IMPLEMENTATION_PLAN.md.
+- Confirmar que o clone está na linha canônica.
+- Identificar alterações locais antes de atualizar ou trocar de branch.
+- Não usar main antiga nem branches Copilot antigas como base.
+- Ler docs/README.md, docs/PROJECT_STATUS.md e a seção correspondente de IMPLEMENTATION_PLAN.md.
 
-## 2. Abrir uma tarefa isolada
+## 2. Modelo de trabalho
 
-Padrão de nome: feature/<fase>-<assunto> ou fix/<assunto>; documentação isolada pode usar docs/<assunto>.
-
-Exemplo para a próxima etapa: feature/phase-5-lexer-audit.
-
-A branch deve nascer da ponta atual de feature/phase-3-integration. Registrar o SHA-base no início da tarefa. Não criar a branch até o clone local e a ponta remota terem sido reconciliados.
+- Trabalhar diretamente na branch canônica para tarefas normais.
+- Fazer commits pequenos, cada um com objetivo claro.
+- Não criar uma branch permanente para cada fase.
+- Criar branch temporária somente quando houver necessidade real de isolamento ou risco de uma experiência.
+- Se uma branch temporária for criada, integrar ou descartar ao fim da tarefa e removê-la; não deixá-la como linha paralela esquecida.
+- Não abrir PR para o próprio fluxo rotineiro da linha única.
+- A branch main histórica não deve receber merges da linha canônica enquanto não for normalizada/renomeada.
 
 ## 3. Contrato para o Copilot
 
 Todo prompt de implementação deve conter:
 
-1. Repositório e branch-base exatos.
+1. Repositório e branch canônica exatos.
 2. SHA-base conhecido.
 3. Objetivo e comportamento esperado.
 4. Arquivos permitidos para alteração.
@@ -41,11 +44,11 @@ Todo prompt de implementação deve conter:
 8. Instrução explícita para não declarar teste Excel PASS sem execução real.
 9. Entregáveis: resumo, lista de arquivos, decisões, riscos, testes executados/não executados e commit SHA.
 
-O Copilot não deve receber instrução vaga como “implemente a Fase 5” quando a fase já contém código. Primeiro fornecer a auditoria e a matriz de lacunas; só depois autorizar correções.
+Quando o código já existe, o Copilot deve primeiro produzir auditoria e matriz de lacunas. Não pedir “implemente a fase” como se ela estivesse vazia.
 
 ## 4. Implementação e revisão
 
-- Manter cada tarefa pequena e com escopo explícito.
+- Manter cada alteração pequena e com escopo explícito.
 - Não misturar refatoração estrutural, mudança de comportamento e documentação sem necessidade.
 - Preservar API pública ou descrever migração e atualizar consumidores.
 - Não criar classes auxiliares apenas por preferência estética; justificar pelo acoplamento, responsabilidade ou teste.
@@ -73,25 +76,15 @@ O checkout e os módulos carregados são identidades diferentes. Se o runner inf
 - Um teste presente no código não está automaticamente executado.
 - NOT RUN, BLOCKED, FAIL e ERROR nunca podem ser convertidos em PASS por inspeção estática.
 - Atualizar a referência quando o comportamento ou a suíte mudar.
-- Atualizar o índice em docs/test-reports/README.md e o resumo em docs/PROJECT_STATUS.md após uma execução relevante.
+- Atualizar docs/test-reports/README.md e docs/PROJECT_STATUS.md após uma execução relevante.
 
-## 7. Pull request e integração
-
-Antes do PR:
-- revisar o diff contra a branch-base;
-- confirmar que o branch não está baseado em snapshot antigo;
-- verificar que o relatório de testes corresponde às revisões carregadas;
-- listar limitações e testes não executados.
-
-O PR deve declarar escopo, evidências, ressalvas e itens explicitamente fora do escopo. O destino padrão das tarefas será feature/phase-3-integration; main só recebe marcos revisados.
-
-## 8. Fechamento de tarefa
+## 7. Fechamento de tarefa
 
 Ao concluir:
-1. registrar commit e PR;
+1. registrar commit e SHA;
 2. atualizar IMPLEMENTATION_PLAN.md se o status/escopo da fase mudou;
 3. atualizar docs/PROJECT_STATUS.md;
 4. atualizar referências/logs de teste;
-5. atualizar docs/BRANCH_STATUS.md quando branches forem criadas, integradas ou removidas;
-6. deixar explícito o próximo passo e a branch-base correta.
+5. atualizar docs/BRANCH_STATUS.md somente quando a estratégia ou o estado das referências mudar;
+6. deixar explícito o próximo passo na mesma linha canônica.
 
