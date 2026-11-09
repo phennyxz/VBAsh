@@ -1,3 +1,4 @@
+' @VBAshRevision clsParser-r2
 Option Explicit
 
 Private mTokens As Collection
