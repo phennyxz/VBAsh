@@ -223,7 +223,7 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 - Teste 1: comando externo simples (`dir`, `echo`, `cmd /c echo`) é reconhecido como externo.
 - Teste 2: builtin registrado é reconhecido corretamente.
 - Teste 3: função registrada é resolvida antes de executável.
-- Teste 4: alias registrado é resolvido corretamente.
+- Teste 4: alias registrado é expandido antes da AST e o nome resultante segue para a resolução pós-AST.
 - Teste 5: comando vazio retorna erro sem quebrar shell.
 
 ---
