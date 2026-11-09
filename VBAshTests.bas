@@ -1639,6 +1639,13 @@ Private Sub TestDescriptorRedirection()
     AssertEqual "retained", result, "closing a nonstandard descriptor leaves stdout operational"
     AssertTrue table.HasDescriptor(3), "scope restores a descriptor closed during command execution"
 
+    result = session.ProcessInput("echo hidden >&-")
+    AssertEqual 1, session.LastExitCode, "writing to a closed stdout descriptor reports failure"
+    AssertTrue Not session.HasOutput And session.HasErrorOutput, _
+               "closed stdout is not displayed and reports the bad descriptor on stderr"
+    AssertTrue InStr(1, session.ErrorOutput, "bad file descriptor: 1", vbTextCompare) > 0, _
+               "closed stdout diagnostic identifies descriptor one"
+
     result = session.ProcessInput("pwd extra 2>&1 > """ & path & """")
     AssertEqual 2, session.LastExitCode, "ordered descriptor redirection preserves command status"
     AssertTrue session.HasOutput, "stderr duplicated before stdout redirect remains visible on original stdout"
