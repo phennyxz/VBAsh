@@ -98,13 +98,14 @@ Definir o estado da sessão do shell: ambiente, diretório atual, variáveis, hi
 Implementar a camada de entrada/saída que representa stdin, stdout e stderr, além de redirecionamentos básicos.
 
 ### Módulos envolvidos
-- CStream
-- CFileDescriptorTable
-- CConsoleStream
-- CFileStream
-- CPipeStream
-- CNullStream
-- CRedirectionManager
+- `IStream`
+- `clsFileDescriptorTable`
+- `clsDescriptorScope` / `clsDescriptorScopeEntry`
+- `clsConsoleStream`
+- `clsFileStream`
+- `clsPipeStream`
+- `clsNullStream`
+- `clsRedirectionManager`
 
 ### Dependências
 - Fase 1: terminal funcional
