@@ -357,7 +357,7 @@ Private Function LoadedModuleReport(ByRef warnings As String, ByRef unverifiedCo
     names = Array("VBAsh", "VBAshTests", "IStream", "clsSession", "clsTokenizer", _
                   "clsParser", "clsFileStream", "clsMemoryStream", _
                   "clsNullStream", "clsFileDescriptorTable", "clsDescriptorScope", _
-                  "clsDescriptorScopeEntry", "clsRedirectionManager", "clsConsoleStream", "clsPipeStream", "clsResolvedCommand", "clsBuiltinRegistry")
+                  "clsDescriptorScopeEntry", "clsRedirectionManager", "clsConsoleStream", "clsPipeStream", "clsResolvedCommand", "clsBuiltinRegistry", "clsCommandResolver")
     For index = LBound(names) To UBound(names)
         tag = ReadModuleTag(CStr(names(index)))
         prop = ReadModuleProperty(CStr(names(index)))
@@ -453,6 +453,10 @@ Private Function ReadModuleProperty(ByVal moduleName As String) As String
             Dim pipeStream As clsPipeStream
             Set pipeStream = New clsPipeStream
             ReadModuleProperty = pipeStream.ModuleRevision
+        Case "clsCommandResolver"
+            Dim commandResolver As clsCommandResolver
+            Set commandResolver = New clsCommandResolver
+            ReadModuleProperty = commandResolver.ModuleRevision
         Case "clsResolvedCommand"
             Dim resolvedCommand As clsResolvedCommand
             Set resolvedCommand = New clsResolvedCommand
