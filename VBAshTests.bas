@@ -17,7 +17,7 @@ Private Const RUNNER_REVISION As String = "VBAshTests-r10"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
-Private Const EXPECTED_TEST_COUNT As Long = 26
+Private Const EXPECTED_TEST_COUNT As Long = 27
 
 Public Sub VBAsh_RunTests()
     Dim startedAt As Date
@@ -63,6 +63,7 @@ Public Sub VBAsh_RunTests()
     RunTest "ResolvedCommand"
     RunTest "BuiltinRegistry"
     RunTest "CommandResolver"
+    RunTest "AliasExpansion"
 
     finishedAt = Now
     summary = TestRunSummary()
@@ -127,6 +128,7 @@ Private Sub RunTest(ByVal testName As String)
         Case "ResolvedCommand": TestResolvedCommand
         Case "BuiltinRegistry": TestBuiltinRegistry
         Case "CommandResolver": TestCommandResolver
+        Case "AliasExpansion": TestAliasExpansion
         Case Else
             Err.Raise vbObjectError + 1102, "VBAshTests.RunTest", _
                       "Teste não registrado: " & testName
@@ -3055,4 +3057,127 @@ Private Sub AssertTrue(ByVal condition As Boolean, ByVal description As String)
         mFailActual = "False"
         Err.Raise ASSERT_TRUE_ERROR, "VBAshTests", description
     End If
+End Sub
+
+
+Private Sub TestAliasExpansion()
+    Dim registry As clsAliasRegistry
+    Dim expander As clsAliasExpander
+    Dim tokenizer As clsTokenizer
+    Dim tokens As Collection
+    Dim expanded As Collection
+    Dim session As clsSession
+    Dim result As String
+    Dim errorNumber As Long
+
+    Set registry = New clsAliasRegistry
+    Set expander = New clsAliasExpander
+    Set tokenizer = New clsTokenizer
+
+    registry.RegisterAlias "ll", "echo -n fixed"
+    AssertTrue registry.HasAlias("ll"), "alias registry reports registered names"
+    AssertEqual "echo -n fixed", registry.ResolveAlias("ll"), _
+                "alias registry returns replacement text"
+    AssertEqual 1, registry.Count, "alias registry tracks entry count"
+
+    On Error Resume Next
+    registry.RegisterAlias "ll", "echo overwritten"
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual vbObjectError + 1401, errorNumber, _
+                "duplicate aliases are rejected unless replacement is explicit"
+    registry.RegisterAlias "ll", "echo -n fixed", True
+    AssertTrue registry.RemoveAlias("ll"), "registered alias can be removed"
+    AssertTrue Not registry.HasAlias("ll"), "removed alias is no longer present"
+    AssertTrue Not registry.RemoveAlias("ll"), "removing an absent alias returns False"
+
+    registry.RegisterAlias "ll", "echo -n fixed"
+    Set tokens = tokenizer.Tokenize("ll /home")
+    Set expanded = expander.ExpandTokens(tokens, registry)
+    AssertEqual "echo", CStr(expanded(1).Value), "alias replacement supplies command name"
+    AssertEqual "-n", CStr(expanded(2).Value), "alias replacement can introduce options"
+    AssertEqual "fixed", CStr(expanded(3).Value), "alias replacement can introduce arguments"
+    AssertEqual "/home", CStr(expanded(4).Value), "original arguments follow replacement words"
+    AssertEqual "EOF", CStr(expanded(expanded.Count).TokenType), _
+                "expanded token stream retains EOF"
+
+    Set tokens = tokenizer.Tokenize("echo ll")
+    Set expanded = expander.ExpandTokens(tokens, registry)
+    AssertEqual "ll", CStr(expanded(2).Value), "aliases are not expanded in argument position"
+
+    Set tokens = tokenizer.Tokenize("ll; ll")
+    Set expanded = expander.ExpandTokens(tokens, registry)
+    AssertEqual "echo", CStr(expanded(1).Value), "alias expands at line start"
+    AssertEqual "echo", CStr(expanded(5).Value), "alias expands after semicolon"
+
+    Set tokens = tokenizer.Tokenize("ll | ll && ll")
+    Set expanded = expander.ExpandTokens(tokens, registry)
+    AssertEqual "echo", CStr(expanded(1).Value), "alias expands before a pipeline operator"
+    AssertEqual "echo", CStr(expanded(5).Value), "alias expands after a pipe"
+    AssertEqual "echo", CStr(expanded(9).Value), "alias expands after a logical operator"
+
+    Set tokens = tokenizer.Tokenize("ll > ll")
+    Set expanded = expander.ExpandTokens(tokens, registry)
+    AssertEqual "echo", CStr(expanded(1).Value), "command alias expands before redirection"
+    AssertEqual "ll", CStr(expanded(5).Value), "redirection target is not alias-expanded"
+
+    Set tokens = tokenizer.Tokenize("> arquivo ll")
+    Set expanded = expander.ExpandTokens(tokens, registry)
+    AssertEqual "REDIR_OUT", CStr(expanded(1).TokenType), _
+                "leading redirection remains before the command"
+    AssertEqual "arquivo", CStr(expanded(2).Value), _
+                "leading redirection target is preserved"
+    AssertEqual "echo", CStr(expanded(3).Value), _
+                "command after leading redirection is alias-expanded"
+
+    Set tokens = tokenizer.Tokenize("'ll'")
+    Set expanded = expander.ExpandTokens(tokens, registry)
+    AssertEqual "ll", CStr(expanded(1).Value), "single-quoted command word is not expanded"
+
+    Set tokens = tokenizer.Tokenize("""ll""")
+    Set expanded = expander.ExpandTokens(tokens, registry)
+    AssertEqual "ll", CStr(expanded(1).Value), "double-quoted command word is not expanded"
+
+    Set tokens = tokenizer.Tokenize("VAR=value ll")
+    Set expanded = expander.ExpandTokens(tokens, registry)
+    AssertEqual "VAR=value", CStr(expanded(1).Value), _
+                "assignment prefix remains before the command"
+    AssertEqual "echo", CStr(expanded(2).Value), _
+                "alias expands after an assignment prefix"
+
+    registry.RegisterAlias "self", "self --flag"
+    Set tokens = tokenizer.Tokenize("self")
+    Set expanded = expander.ExpandTokens(tokens, registry)
+    AssertEqual "self", CStr(expanded(1).Value), _
+                "recursive self-reference is emitted literally"
+    AssertEqual "--flag", CStr(expanded(2).Value), _
+                "self-referential alias still contributes its remaining words"
+
+    registry.RegisterAlias "cycle-a", "cycle-b"
+    registry.RegisterAlias "cycle-b", "cycle-a"
+    Set tokens = tokenizer.Tokenize("cycle-a")
+    Set expanded = expander.ExpandTokens(tokens, registry)
+    AssertEqual "cycle-a", CStr(expanded(1).Value), _
+                "mutually recursive aliases terminate at the active alias"
+
+    Set session = New clsSession
+    session.RegisterAlias "say", "echo fixed"
+    result = session.ProcessInput("say tail")
+    AssertEqual "fixed tail", result, _
+                "session expands aliases before parsing and executing builtins"
+    AssertEqual 0, session.LastExitCode, "successful alias expansion preserves builtin status"
+
+    registry.RegisterAlias "empty", ""
+    Set tokens = tokenizer.Tokenize("empty echo")
+    Set expanded = expander.ExpandTokens(tokens, registry)
+    AssertEqual "echo", CStr(expanded(1).Value), _
+                "empty alias replacement leaves following word in command position"
+
+    On Error Resume Next
+    registry.RegisterAlias "bad name", "echo"
+    errorNumber = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    AssertEqual vbObjectError + 1400, errorNumber, "invalid alias names are rejected"
 End Sub
