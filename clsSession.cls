@@ -1,4 +1,4 @@
-' @VBAshRevision clsSession-r3
+' @VBAshRevision clsSession-r4
 Option Explicit
 
 Public CurrentDirectory As String
@@ -22,7 +22,7 @@ Private mStandardError As clsConsoleStream
 Private mPendingDescriptorScope As clsDescriptorScope
 
 Public Property Get ModuleRevision() As String
-    ModuleRevision = "clsSession-r3"
+    ModuleRevision = "clsSession-r4"
 End Property
 
 
