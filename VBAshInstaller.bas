@@ -402,6 +402,11 @@ Private Function VBAshFormEventsCode() As String
         "        KeyCode = 0", _
         "        SubmitCommand", _
         "    End If", _
+        "End Sub", _
+        "Private Sub UserForm_Terminate()", _
+        "    On Error Resume Next", _
+        "    If Not gFDTable Is Nothing Then gFDTable.CloseAll", _
+        "    On Error GoTo 0", _
         "End Sub"), vbCrLf)
 End Function
 
