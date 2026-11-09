@@ -180,6 +180,15 @@ Criar o registrador de comandos que identifica o tipo de comando: builtin, funç
 - Esta entrega define apenas o contrato. Não resolve aliases/funções/executáveis, não altera a sessão e não executa comandos.
 - Testes isolados adicionados ao runner `VBAshTests-r8`; a compilação e execução no Excel ainda dependem da validação do usuário.
 
+### Implementação incremental — registry de builtins (Fase 4B)
+
+- `clsBuiltinRegistry` mantém os builtins padrão e agora permite extensões por `RegisterBuiltin(commandName, builtin, Optional replaceExisting=False)`.
+- Nomes são consultados sem distinção entre maiúsculas/minúsculas; nomes vazios ou com espaço/tabulação são rejeitados.
+- Duplicatas são rejeitadas por padrão. Substituição exige `replaceExisting=True`, evitando sobrescrita silenciosa.
+- `HasBuiltin` consulta presença e `UnregisterBuiltin` remove um registro, retornando Boolean para indicar se havia item.
+- `Resolve(commandName) As IBuiltin` permanece compatível com o chamador atual. A API ainda não foi exposta por `clsCommandResolver` nem por `clsSession`; a integração do resolver será uma etapa posterior.
+- A revisão `clsBuiltinRegistry-r1` e a suíte `BuiltinRegistry` foram adicionadas ao runner `VBAshTests-r9`. A execução no Excel ainda depende da validação do usuário.
+
 ### Critérios de conclusão
 - O shell consegue classificar um comando em uma de várias categorias.
 - O registry resolve a prioridade correta:
