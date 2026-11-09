@@ -1657,6 +1657,7 @@ Private Sub TestDescriptorRedirection()
     AssertTrue Not session.HasOutput, "stdout-to-stderr duplication removes normal output channel"
     AssertTrue session.HasErrorOutput, "stdout-to-stderr duplication is visible on stderr channel"
     AssertEqual "routed", session.ErrorOutput, "stdout-to-stderr duplication preserves output text"
+    AssertEqual "routed" & vbCrLf, stderrStream.Contents, "stderr console adapter captures redirected stdout"
 
     result = session.ProcessInput("pwd extra 2>&1")
     AssertEqual "VBAsh: Uso: pwd", result, "stderr-to-stdout duplication returns merged text on stdout"
@@ -1672,7 +1673,8 @@ Private Sub TestDescriptorRedirection()
 
     table.SetDescriptor 3, stdoutStream
     result = session.ProcessInput("echo duplicated 1>&3")
-    AssertEqual "duplicated", result, "multi-digit-capable descriptor duplication routes stdout through FD 3"
+    AssertEqual "duplicated", result, "arbitrary descriptor duplication routes stdout through FD 3"
+    AssertEqual "duplicated" & vbCrLf, stdoutStream.Contents, "stdout console adapter captures descriptor output"
     result = session.ProcessInput("echo retained 3>&-")
     AssertEqual "retained", result, "closing a nonstandard descriptor leaves stdout operational"
     AssertTrue table.HasDescriptor(3), "scope restores a descriptor closed during command execution"
