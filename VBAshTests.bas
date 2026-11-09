@@ -681,6 +681,10 @@ Private Sub TestParserAst()
     AssertEqual "REDIR_OUT", node.Redirections(1).Operator, "redirection operator preserved"
     AssertEqual "out", node.Redirections(1).Target, "redirection target preserved"
 
+    Set node = parser.ParseAst(tokenizer.Tokenize("cat < input.txt"), "cat < input.txt")
+    AssertEqual "REDIR_IN", node.Redirections(1).Operator, "input redirection operator preserved"
+    AssertEqual "input.txt", node.Redirections(1).Target, "input redirection target preserved"
+
     AssertAstSyntaxError tokenizer, parser, "", "empty input is rejected"
     AssertAstSyntaxError tokenizer, parser, "; a", "leading sequence separator is rejected"
     AssertAstSyntaxError tokenizer, parser, "a ;; b", "consecutive sequence separators are rejected"
