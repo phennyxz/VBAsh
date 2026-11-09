@@ -1,4 +1,4 @@
-' @VBAshRevision VBAshTests-r11
+' @VBAshRevision VBAshTests-r12
 Option Explicit
 
 Private mAssertions As Long
@@ -13,11 +13,11 @@ Private mLastAssertNumber As Long
 Private mLastAssertDescription As String
 Private mFailExpected As String
 Private mFailActual As String
-Private Const RUNNER_REVISION As String = "VBAshTests-r11"
+Private Const RUNNER_REVISION As String = "VBAshTests-r12"
 
 Private Const ASSERT_EQUAL_ERROR As Long = vbObjectError + 1100
 Private Const ASSERT_TRUE_ERROR As Long = vbObjectError + 1101
-Private Const EXPECTED_TEST_COUNT As Long = 27
+Private Const EXPECTED_TEST_COUNT As Long = 28
 
 Public Sub VBAsh_RunTests()
     Dim startedAt As Date
@@ -64,6 +64,7 @@ Public Sub VBAsh_RunTests()
     RunTest "BuiltinRegistry"
     RunTest "CommandResolver"
     RunTest "AliasExpansion"
+    RunTest "AliasBuiltins"
 
     finishedAt = Now
     summary = TestRunSummary()
@@ -129,6 +130,7 @@ Private Sub RunTest(ByVal testName As String)
         Case "BuiltinRegistry": TestBuiltinRegistry
         Case "CommandResolver": TestCommandResolver
         Case "AliasExpansion": TestAliasExpansion
+        Case "AliasBuiltins": TestAliasBuiltins
         Case Else
             Err.Raise vbObjectError + 1102, "VBAshTests.RunTest", _
                       "Teste não registrado: " & testName
@@ -359,7 +361,8 @@ Private Function LoadedModuleReport(ByRef warnings As String, ByRef unverifiedCo
     names = Array("VBAsh", "VBAshTests", "IStream", "clsSession", "clsTokenizer", _
                   "clsParser", "clsFileStream", "clsMemoryStream", _
                   "clsNullStream", "clsFileDescriptorTable", "clsDescriptorScope", _
-                  "clsDescriptorScopeEntry", "clsRedirectionManager", "clsConsoleStream", "clsPipeStream", "clsResolvedCommand", "clsBuiltinRegistry", "clsCommandResolver")
+                  "clsDescriptorScopeEntry", "clsRedirectionManager", "clsConsoleStream", "clsPipeStream", "clsResolvedCommand", "clsBuiltinRegistry", "clsCommandResolver", "clsAliasRegistry", "clsAliasExpander", _
+                  "clsBuiltinAlias", "clsBuiltinUnalias")
     For index = LBound(names) To UBound(names)
         tag = ReadModuleTag(CStr(names(index)))
         prop = ReadModuleProperty(CStr(names(index)))
@@ -435,6 +438,26 @@ Private Function ReadModuleProperty(ByVal moduleName As String) As String
             Dim parserInstance As clsParser
             Set parserInstance = New clsParser
             ReadModuleProperty = parserInstance.ModuleRevision
+        Case "clsAliasRegistry"
+            Dim aliasRegistryInstance As clsAliasRegistry
+            Set aliasRegistryInstance = New clsAliasRegistry
+            ReadModuleProperty = aliasRegistryInstance.ModuleRevision
+        Case "clsAliasExpander"
+            Dim aliasExpanderInstance As clsAliasExpander
+            Set aliasExpanderInstance = New clsAliasExpander
+            ReadModuleProperty = aliasExpanderInstance.ModuleRevision
+        Case "clsBuiltinRegistry"
+            Dim builtinRegistryInstance As clsBuiltinRegistry
+            Set builtinRegistryInstance = New clsBuiltinRegistry
+            ReadModuleProperty = builtinRegistryInstance.ModuleRevision
+        Case "clsBuiltinAlias"
+            Dim builtinAliasInstance As clsBuiltinAlias
+            Set builtinAliasInstance = New clsBuiltinAlias
+            ReadModuleProperty = builtinAliasInstance.ModuleRevision
+        Case "clsBuiltinUnalias"
+            Dim builtinUnaliasInstance As clsBuiltinUnalias
+            Set builtinUnaliasInstance = New clsBuiltinUnalias
+            ReadModuleProperty = builtinUnaliasInstance.ModuleRevision
         Case "clsFileDescriptorTable"
             Dim descriptorTable As clsFileDescriptorTable
             Set descriptorTable = New clsFileDescriptorTable
@@ -3061,6 +3084,51 @@ Private Sub AssertTrue(ByVal condition As Boolean, ByVal description As String)
     End If
 End Sub
 
+
+Private Sub TestAliasBuiltins()
+    Dim session As clsSession
+    Dim output As String
+
+    Set session = New clsSession
+
+    output = session.ProcessInput("alias rr=echo ready")
+    AssertTrue session.HasAlias("rr"), "alias builtin registers a new alias"
+    AssertEqual "echo ready", session.GetAlias("rr"), "alias builtin stores the complete replacement"
+    AssertEqual 0, session.LastExitCode, "alias registration succeeds"
+
+    output = session.ProcessInput("rr world")
+    AssertEqual "ready world", output, "registered alias is expanded and executed through ProcessInput"
+    AssertEqual 0, session.LastExitCode, "expanded alias command returns success"
+
+    output = session.ProcessInput("alias rr")
+    AssertEqual "alias rr='echo ready'", output, "alias name query prints reusable shell syntax"
+
+    output = session.ProcessInput("alias")
+    AssertTrue InStr(1, output, "alias rr='echo ready'", vbBinaryCompare) > 0, _
+               "alias without arguments lists registered aliases"
+
+    output = session.ProcessInput("alias rr=echo updated")
+    AssertEqual "echo updated", session.GetAlias("rr"), "alias builtin replaces an existing definition"
+    output = session.ProcessInput("rr")
+    AssertEqual "updated", output, "replacement takes effect on the next command"
+
+    output = session.ProcessInput("alias quoted=""echo hello world""")
+    AssertEqual "hello world", session.ProcessInput("quoted"), _
+                "quoted alias replacement retains spaces as one command string"
+
+    output = session.ProcessInput("unalias rr")
+    AssertTrue Not session.HasAlias("rr"), "unalias removes a named alias"
+    output = session.ProcessInput("rr")
+    AssertEqual 127, session.LastExitCode, "removed alias no longer resolves as a command"
+
+    session.RegisterAlias "one", "echo one"
+    session.RegisterAlias "two", "echo two"
+    output = session.ProcessInput("unalias -a")
+    AssertEqual 0, session.GetAliasNames().Count, "unalias -a clears the session alias registry"
+
+    output = session.ProcessInput("unalias")
+    AssertEqual 2, session.LastExitCode, "unalias without operands reports usage error"
+End Sub
 
 Private Sub TestAliasExpansion()
     Dim registry As clsAliasRegistry
