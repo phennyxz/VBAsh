@@ -1519,8 +1519,8 @@ Private Sub TestDescriptorRedirection()
     Dim session As clsSession
     Dim table As clsFileDescriptorTable
     Dim stdinStream As clsNullStream
-    Dim stdoutStream As clsMemoryStream
-    Dim stderrStream As clsMemoryStream
+    Dim stdoutStream As clsConsoleStream
+    Dim stderrStream As clsConsoleStream
     Dim fileSystem As Object
     Dim path As String
     Dim result As String
@@ -1530,10 +1530,10 @@ Private Sub TestDescriptorRedirection()
     Set table = New clsFileDescriptorTable
     Set stdinStream = New clsNullStream
     stdinStream.Initialize True, False
-    Set stdoutStream = New clsMemoryStream
-    stdoutStream.Initialize "", True, True
-    Set stderrStream = New clsMemoryStream
-    stderrStream.Initialize "", True, True
+    Set stdoutStream = New clsConsoleStream
+    stdoutStream.Initialize False, True
+    Set stderrStream = New clsConsoleStream
+    stderrStream.Initialize False, True
     table.Initialize stdinStream, stdoutStream, stderrStream, True
     session.ConfigureDescriptorTable table, stdoutStream, stderrStream
 
