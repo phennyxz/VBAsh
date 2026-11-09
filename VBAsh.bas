@@ -1,3 +1,4 @@
+' @VBAshRevision VBAsh-host-r2
 Option Explicit
 
 Public gSession As clsSession
