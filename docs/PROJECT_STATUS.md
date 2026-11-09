@@ -2,14 +2,14 @@
 
 **Snapshot:** 2026-11-09  
 **Branch de referência consultada:** feature/phase-3-integration  
-**Branch principal consultada:** main  
-**HEAD de main na auditoria:** 0d4115f4ced6f3772fa38182a71a34fdfee387ce
+**Linha evolutiva canônica:** feature/phase-3-integration  
+**main histórica:** 0d4115f4ced6f3772fa38182a71a34fdfee387ce (não é a referência de desenvolvimento)
 
 Este documento é uma fotografia de estado, não uma promessa de compatibilidade geral com Bash. A implementação descrita deve sempre ser lida junto do branch/commit consultado.
 
 ## Resumo executivo
 
-- O desenvolvimento ativo está em feature/phase-3-integration. A primeira comparação após a rodada documental registrou 155 commits à frente de main e 0 atrás; commits posteriores atualizaram estes próprios registros, portanto essa contagem é histórica e deve ser recalculada localmente antes da próxima branch. A API de comparação não expôs o SHA do HEAD dessa branch; não inventar ou inferir esse SHA.
+- O desenvolvimento ativo e a única linha evolutiva do produto estão em feature/phase-3-integration. main é uma referência histórica atrasada, não uma versão funcional independente; não usar como base de desenvolvimento. A estratégia e a limpeza planejada estão em docs/BRANCH_STATUS.md.
 - O runner VBAshTests-r14 reportou 29/29 suítes PASS, 969 asserções, 0 FAIL e 0 ERROR em execução real no Excel/VBA informada pelo usuário.
 - O relatório r14 identificou as revisões dos módulos carregados, mas checkout/branch/SHA do workbook estavam UNKNOWN e a correspondência checkout/módulos UNVERIFIED.
 - A Fase 4 (Command Registry) pode ser considerada funcionalmente validada no ambiente testado, com a ressalva de rastreabilidade.
