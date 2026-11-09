@@ -1656,6 +1656,19 @@ Private Sub TestDescriptorRedirection()
     contents = ReadRedirectedFile(fileSystem, path, "VBAsh: Uso: pwd" & vbCrLf, _
                                   "descriptor-based stderr")
     AssertEqual "VBAsh: Uso: pwd" & vbCrLf, contents, "descriptor manager writes stderr to file"
+    result = session.ProcessInput("echo appended >> """ & path & """")
+    contents = ReadRedirectedFile(fileSystem, path, _
+        "VBAsh: Uso: pwd" & vbCrLf & "appended" & vbCrLf, "descriptor stdout append")
+    AssertEqual "VBAsh: Uso: pwd" & vbCrLf & "appended" & vbCrLf, _
+                contents, "descriptor manager appends stdout to file"
+
+    result = session.ProcessInput("pwd extra 2>> """ & path & """")
+    contents = ReadRedirectedFile(fileSystem, path, _
+        "VBAsh: Uso: pwd" & vbCrLf & "appended" & vbCrLf & _
+        "VBAsh: Uso: pwd" & vbCrLf, "descriptor stderr append")
+    AssertEqual "VBAsh: Uso: pwd" & vbCrLf & "appended" & vbCrLf & _
+                "VBAsh: Uso: pwd" & vbCrLf, contents, "descriptor manager appends stderr to file"
+
     result = session.ProcessInput("echo routed 1>&2")
     AssertEqual 0, session.LastExitCode, "stdout-to-stderr duplication preserves command status"
     AssertTrue Not session.HasOutput, "stdout-to-stderr duplication removes normal output channel"
